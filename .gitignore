@@ -1,3 +1,8 @@
 *.csv
 *.tsv
 *.txt
+*.png
+*.pdf
+*.html
+*.docx
+*.rtf
