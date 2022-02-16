@@ -27,7 +27,7 @@ import csv
 import json 
 
 dirf = sys.argv[1]
-log_files = glob.glob(dirf + "/*/*/*.salmon/aux_info/meta_info.json")
+log_files = glob.glob(dirf + "/*/*/salmon/aux_info/meta_info.json")
 p_log_files = glob.glob(dirf + "/*/*/processes.log")
 print(len(log_files))
 print(len(p_log_files))

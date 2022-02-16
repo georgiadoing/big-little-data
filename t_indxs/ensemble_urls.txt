@@ -1,2 +1,5 @@
 ftp://ftp.ensemblgenomes.org/pub/bacteria/release-49/fasta/bacteria_16_collection/pseudomonas_aeruginosa_ucbpp_pa14_gca_000014625/cdna/Pseudomonas_aeruginosa_ucbpp_pa14_gca_000014625.ASM1462v1.cdna.all.fa.gz
 ftp://ftp.ensemblgenomes.org/pub/bacteria/release-49/fasta/bacteria_5_collection/pseudomonas_aeruginosa_pao1_gca_000006765/cdna/Pseudomonas_aeruginosa_pao1_gca_000006765.ASM676v1.cdna.all.fa.gz
+http://ftp.ensemblgenomes.org/pub/bacteria/release-52/fasta/bacteria_6_collection/staphylococcus_epidermidis_atcc_12228_gca_000007645/cdna/Staphylococcus_epidermidis_atcc_12228_gca_000007645.ASM764v1.cdna.all.fa.gz
+http://ftp.ensemblgenomes.org/pub/bacteria/release-52/fasta/bacteria_0_collection/staphylococcus_aureus_subsp_aureus_n315_gca_000009645/cdna/Staphylococcus_aureus_subsp_aureus_n315_gca_000009645.ASM964v1.cdna.all.fa.gz
+https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/013/425/GCF_000013425.1_ASM1342v1/GCF_000013425.1_ASM1342v1_cds_from_genomic.fna.gz

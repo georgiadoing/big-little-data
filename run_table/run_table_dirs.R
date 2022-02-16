@@ -23,6 +23,7 @@
 ##  User must have write permissions
 ##
 ## ---------------------------
+library(R.utils)
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -32,14 +33,20 @@ if (length(args)==0) {
 }
 # load in SraRunTable from the first argument
 run_table <- read.csv(args[1], stringsAsFactors = F)
+mkdirs('./test/')
+#id $SLURM_SUBMIT_DIR
+
+#conda activate salmon
+
 
 # Using the run table make dirs nested within sra_comp/
 # of projects and experiments
 # where leaf dirs contain txt files of run accessions
-lapply(unique(run_table$SRA_study), function(study){
-  sdir <- paste('./sra_comp/',study, sep='')
+print(colnames(run_table))
+lapply(unique(run_table$SRA.Study), function(study){
+  sdir <- paste(paste('.',args[2],sep='/'),study, sep='/')
   mkdirs(sdir)
-  exps <- unique(run_table$Experiment[run_table$SRA_study == study])
+  exps <- unique(run_table$Experiment[run_table$SRA.Study == study])
   lapply(exps, function(exp){
     edir <- paste(sdir, exp, sep='/')
     mkdirs(edir)

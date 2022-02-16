@@ -39,7 +39,7 @@ sf_files <- list.files(args[1], pattern= '.sf',
 ## parse file paths to get experiment accession
 sf_names <- sapply(list.files(args[1], pattern= '.sf', 
                               recursive = TRUE, full.names = FALSE), function(x)
-                                substring(x, regexpr('/[E,S]RX',x)+1, regexpr('/quant',x)-1))
+                                substring(x, regexpr('/[E,S,D]RX',x)+1, regexpr('/salmon',x)-1))
 # Read in the data from all quant files
 sf_datasets <- lapply(sf_files, function(x) read.csv(x, sep = '\t',
                                                      stringsAsFactors = FALSE))
@@ -54,7 +54,7 @@ sf_all_tpm <- sf_all_tpm[,-c(2,3,5)]
 
 # name columns as experiment accession
 colnames(sf_all_reads) <- c('Name',sf_names)
-colnames(sf_all_tpm) <- c('Name',sf_names)
+colnames(sf_all_tpm) <- c('Name', sf_names)  #sapply(sf_names, function(x) substr(x,1,grep('.',unlist(strsplit(x,'')),fixed=T)[1]-1)))
 
 # load in genome to convert t-index names to gene names
 #genome_fasta <- readDNAStringSet(args[2])
