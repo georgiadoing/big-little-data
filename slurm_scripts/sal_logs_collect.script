@@ -1,0 +1,27 @@
+#!/bin/bash -l
+
+################################################################################
+#Script Name: sal_out_collect.pbs
+#Desription : collect salmon output into matrices
+#Args       : dir, genome, outfile suffix
+#Author     : Georgia Doing
+#Date       : 12-18-20
+#Email      : Georgia.Doing.GR@Dartmouth.edu
+################################################################################
+
+
+##SBATCH --account NCCC
+#SBATCH --job-name=sal_logs_col
+#SBATCH --time=02:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
+#SBATCH --mail-user=Georgia.Doing@jax.org
+
+
+
+
+cd $SLURM_SUBMIT_DIR
+
+
+python ../shape_comp/logs_collect.py /fastscratch/doingg/salmon/se_12228_k15/sra_comp \
+

@@ -1,0 +1,62 @@
+#!/bin/bash -l
+
+################################################################################
+#Script Name: sal_out_collect.pbs
+#Desription : collect salmon output into matrices
+#Args       : dir, genome, outfile suffix
+#Author     : Georgia Doing
+#Date       : 12-18-20
+#Email      : Georgia.Doing.GR@Dartmouth.edu
+################################################################################
+
+
+##SBATCH --account NCCC
+#SBATCH --job-name=sal_out_col
+#SBATCH --time=02:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
+#SBATCH --mail-user=Georgia.Doing@jax.org
+
+
+
+
+cd $SLURM_SUBMIT_DIR
+
+conda activate Renv
+
+#Rscript ../shape_comp/quant_collect.R /dartfs-hpc/scratch/f002bx6/salmon/pao1_cdna_k15/sra_comp \
+#../shape_comp/pao1_asm676v1cdna_gene_names.csv \
+#pao1_cdna_k15.csv
+
+
+#Rscript ../shape_comp/quant_collect.R /dartfs-hpc/scratch/f002bx6/salmon/pa14_cdna_k15/sra_comp \
+#../shape_comp/pa14_gene_names.csv \
+#pa14_cdna_k15.csv
+
+#Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/se_12228_k15/sra_comp \
+#../shape_comp/se12228_gene_names.csv \
+#se12228_cdna_k15.csv
+
+#Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/sa_NCTC8325_k15/saur_comp \
+#../shape_comp/sa_nctc8325_gene_names.csv \
+#sa_nctc3825_cds_k15.csv
+
+#Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/se_RP62A_k15/sra_comp \
+#../shape_comp/se_rp62a_gene_names.csv \
+#se_rp62a_epi_comp_cdna_k15.csv
+
+#Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/se_RP62A_k15/saur_comp \
+#../shape_comp/se_rp62a_gene_names.csv \
+#se_rp62a_aureus_comp_cdna_k15.csv
+
+Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/pandb_b_1282_k15/sra_comp \
+../shape_comp/pandb_b_1282_gene_names.csv \
+se_pandb1282_epi_comp_k15.csv
+
+#Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/se_atcc12228_rp62a_k15/sra_comp \
+#../shape_comp/se_atcc12228_and_rp62a_gene_names.csv \
+#se_atcc12228_and_rp62a_epi_comp_cdna_k15.csv
+
+#Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/se_rp62a_atcc12228_k15/sra_comp \
+#../shape_comp/se_atcc12228_and_rp62a_gene_names.csv \
+#se_rp62a_and_atcc12228_epi_comp_cdna_k15.csv

@@ -1,0 +1,21 @@
+#!/bin/bash -l
+
+################################################################################
+#Script Name: salmon_ti.script
+#Desription : create transcriptome indices from cdna fasta
+#Args       : None 
+#Author     : Georgia Doing
+#Date       : 1-14-2022
+#Email      : Georgia.Doing@JAX.org
+################################################################################
+
+##SBATCH --account doingg
+#SBATCH --job-name=sal_ti
+#SBATCH --time=02:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
+##PBS -m bea
+#SBATCH --mail-user=Georgia.Doing@JAX.org
+
+cd $SLURM_SUBMIT_DIR
+Rscript ../run_table/run_table_dirs.R ../run_table/SraRunTable_Sa.csv ../run_table/saur_comp

@@ -1,0 +1,43 @@
+#!/bin/bash -l
+
+################################################################################
+#Script Name: salmon_ti.script
+#Desription : create transcriptome indices from cdna fasta
+#Args       : None 
+#Author     : Georgia Doing
+#Date       : 1-14-2022
+#Email      : Georgia.Doing@JAX.org
+################################################################################
+
+##SBATCH --account doingg
+#SBATCH --job-name=sal_ti
+#SBATCH --time=02:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
+##PBS -m bea
+#SBATCH --mail-user=Georgia.Doing@JAX.org
+
+
+cd $SLURM_SUBMIT_DIR
+
+conda activate micro-seq-comp
+
+
+#Pseudomonas_aeruginosa_pao1_gca_000006765.ASM676v1.cdna.all.fa.gz
+#Pseudomonas_aeruginosa_ucbpp_pa14_gca_000014625.ASM1462v1.cdna.all.fa.gz
+#salmon index -t ../t_indxs/Staphylococcus_aureus_subsp_aureus_n315_gca_000009645.ASM964v1.cdna.all.fa.gz \
+#             -i ../t_indxs/sa_N315_k15 -k 15
+#salmon index -t ../t_indxs/Staphylococcus_epidermidis_atcc_12228_gca_000007645.ASM764v1.cdna.all.fa.gz \
+#             -i ../t_indxs/se_12228_k15 -k 15
+#salmon index -t ../t_indxs/Staphylococcus_aureus_NCTC_8325_GCF_000013425.1_ASM1342v1_cds_from_genomic.fna.gz \
+#             -i ../t_indxs/sa_NCTC8325_k15 -k 15
+#salmon index -t ../t_indxs/pao1_cdna.fa.gz -i ../t_indxs/pao1_cdna_k15 -k 15
+#salmon index -t ../t_indxs/pa14_cdna.fa.gz -i ../t_indxs/pa14_cdna_k15 -k 15
+
+#salmon index -t ../t_indxs/Staphylococcus_epidermidis_atcc12228_rp62a_comb.fa.gz \
+#             -i ../t_indxs/se_atcc12228_rp62a_k15 -k 15
+#salmon index -t ../t_indxs/Staphylococcus_epidermidis_rp62a_atcc12228_comb.fa.gz \
+#             -i ../t_indxs/se_rp62a_atcc12228_k15 -k 15
+
+salmon index -t ../t_indxs/pandb_bacteria_1282.fa.gz \
+             -i ../t_indxs/pandb_b_1282_k15 -k 15
