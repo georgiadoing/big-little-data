@@ -3,23 +3,11 @@
 ################################################################################
 #Script Name: sra_to_salmon_pa14.pbs
 #Description: Submission script for sra_to_salmon job arrays
-#Args       : None 
+#Args       : None
 #Author     : Georgia Doing
 #Email      : Georgia.Doing.GR@Dartmouth.edu
 ################################################################################
 
-#PBS -q largeq
-#PBS -A NCCC
-#PBS -N s2sO1
-#PBS -l walltime=15:00:00
-#PBS -l nodes=1:ppn=6
-#PBS -m bea
-#PBS -M Georgia.Doing.GR@Dartmouth.edu
-#PBS -t 0-1500%50
-#PBS -j oe
-#PBS -e /dartfs-hpc/scratch/f002bx6/salmon/sra_comp/oe
-#PBS -o /dartfs-hpc/scratch/f002bx6/salmon/sra_comp/oe
-#PBS -l feature='cellk'
 
 #SBATCH --partition=standard
 ##SBATCH --partition=bigmem
@@ -42,7 +30,7 @@
 # This level of parallelization, at the expeirment level,
 # allows for each job to download and process together (in a
 # single salmon quant call) the sequence
-# data associated with a single experiement accession, 
+# data associated with a single experiement accession,
 # which for this data is 1-10 fastq files and 8KB - 18GB. Each
 # job is given 1 processor and 30 min, 3013 jobs are submitted
 # and run 20 at a time.
@@ -66,7 +54,7 @@ mkdir -p /scratch/f002bx6
 mkdir /scratch/f002bx6/$SLURM_JOB_ID
 #ls -R /scratch/$PBS_JOBID
 
-if ../shell_scripts/sra2sal_byx.sh ${SLURM_ARRAY_TASK_ID} pao1_cdna_k15 ; then
+if ../shell_scripts/sra2sal_byx_DISCOVERY.sh ${SLURM_ARRAY_TASK_ID} pao1_cdna_k15 ; then
     echo $SLURM_JOB_ID quant succeeded
     du -h --max-depth 1 /scratch/f002bx6
 #    ls /scratch/$PBS_JOBID
@@ -77,6 +65,6 @@ else
     rm -r /scratch/f002bx6/$SLURM_JOB_ID
     du -h --max-depth 1 /scratch/f002bx6
     exit $rc
-    
+
 #    ls /scratch/$PBS_JOBID
 fi
