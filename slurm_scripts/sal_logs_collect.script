@@ -23,5 +23,5 @@
 cd $SLURM_SUBMIT_DIR
 
 
-python ../shape_comp/logs_collect.py /fastscratch/doingg/salmon/se_12228_k15/sra_comp \
-
+#python ../shape_comp/logs_collect.py /fastscratch/doingg/salmon/se_12228_k15/sra_comp \
+python ../shape_comp/logs_collect.py /fastscratch/doingg/salmon/sa_pandb_b_1280_k15/saur_comp \
