@@ -6,3 +6,11 @@
 *.html
 *.docx
 *.rtf
+*.DS_Store
+*.Rhistory
+*.fa
+*.gz
+*.fna
+*.ffn
+*.out
+*.sif
