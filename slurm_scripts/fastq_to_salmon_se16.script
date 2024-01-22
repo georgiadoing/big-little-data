@@ -16,7 +16,7 @@
 #SBATCH --ntasks-per-node=6
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=Georgia.Doing@JAX.org
-#SBATCH --array=1-3340%10 #3340
+#SBATCH --array=1-161%10
 #SBATCH -o /fastscratch/doingg/oe/%u-%x-%A-%a
 ##SBATCH --mem=128G
 ##SBATCH --hostlist=[k01-58]
@@ -44,6 +44,7 @@
 
 
 
+conda activate micro-seq-comp
 
 cd $SLURM_SUBMIT_DIR
 
@@ -52,17 +53,22 @@ less $SLURM_JOB_NODELIST
 mkdir -p /fastscratch/doingg
 mkdir /fastscratch/doingg/$SLURM_JOB_ID
 #ls -R /scratch/$PBS_JOBID
+#readarray FQFILES < <(find /fastscratch/doingg/spoto_rnaseq/ -type f -regex "*.gz")
+FQFILES=( $( ls /fastscratch/doingg/spoto_rnaseq/*.gz ) )
 
-if ../shell_scripts/sra2sal_byx2.sh ${SLURM_ARRAY_TASK_ID} sa_pandb_b_1280_k15 saur_comp ; then
-    echo $SLURM_JOB_ID quant succeeded
-    du -h --max-depth 1 /fastscratch/doingg
-#    ls /scratch/$PBS_JOBID
-else
-    rc=$?
-    echo $SLURM_JOB_ID quant failed
-    du -h --max-depth 1 /fastscratch/doingg
-    rm -r /fastscratch/doingg/$SLURM_JOB_ID
-    du -h --max-depth 1 /fastscratch/doingg
-    exit $rc 
-#    ls /scratch/$PBS_JOBID
-fi
+echo FQFILES:
+echo ${FQFILES[${SLURM_ARRAY_TASK_ID}]}
+
+
+salmon quant -i  ../t_indxs/se_16_k15 \
+    --softclip \
+    --softclipOverhangs \
+    --minScoreFraction 0.65 \
+    --fldMean 51 \
+    --seqBias \
+    --libType U \
+    -r ${FQFILES[${SLURM_ARRAY_TASK_ID}]}  \
+    -o /fastscratch/doingg/salmon/se_16_k15/sra_comp/SPRspoto-rnaseq/SRXspoto-${SLURM_ARRAY_TASK_ID}/
+
+
+

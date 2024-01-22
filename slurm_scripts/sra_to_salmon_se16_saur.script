@@ -16,7 +16,7 @@
 #SBATCH --ntasks-per-node=6
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=Georgia.Doing@JAX.org
-#SBATCH --array=1-3340%10 #3340
+#SBATCH --array=1-3340%10
 #SBATCH -o /fastscratch/doingg/oe/%u-%x-%A-%a
 ##SBATCH --mem=128G
 ##SBATCH --hostlist=[k01-58]
@@ -53,7 +53,7 @@ mkdir -p /fastscratch/doingg
 mkdir /fastscratch/doingg/$SLURM_JOB_ID
 #ls -R /scratch/$PBS_JOBID
 
-if ../shell_scripts/sra2sal_byx2.sh ${SLURM_ARRAY_TASK_ID} sa_pandb_b_1280_k15 saur_comp ; then
+if ../shell_scripts/sra2sal_byx2.sh ${SLURM_ARRAY_TASK_ID} se_16_k15 saur_comp ; then
     echo $SLURM_JOB_ID quant succeeded
     du -h --max-depth 1 /fastscratch/doingg
 #    ls /scratch/$PBS_JOBID

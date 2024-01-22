@@ -42,5 +42,8 @@ conda activate micro-seq-comp
 #salmon index -t ../t_indxs/pandb_bacteria_1282.fa.gz \
 #             -i ../t_indxs/pandb_b_1282_k15 -k 15
 
-salmon index -t ../t_indxs/sa_pandb_b_1280.fa.gz \
-             -i ../t_indxs/sa_pandb_b_1280_k15 -k 15
+#salmon index -t ../t_indxs/sa_pandb_b_1280.fa.gz \
+#             -i ../t_indxs/sa_pandb_b_1280_k15 -k 15
+
+salmon index -t ../t_indxs/se_pandb_b_1282_p.fa.gz \
+             -i ../t_indxs/se_pandb_b_1282_p_k15 -k 15

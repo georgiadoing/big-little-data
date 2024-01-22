@@ -53,7 +53,7 @@ mkdir -p /fastscratch/doingg
 mkdir /fastscratch/doingg/$SLURM_JOB_ID
 #ls -R /scratch/$PBS_JOBID
 
-if ../shell_scripts/sra2sal_byx2.sh ${SLURM_ARRAY_TASK_ID} pandb_b_1282_k15 sra_comp ; then
+if ../shell_scripts/sra2sal_byx2.sh ${SLURM_ARRAY_TASK_ID} se_pandb_b_1282_p_k15 sra_comp ; then
     echo $SLURM_JOB_ID quant succeeded
     du -h --max-depth 1 /fastscratch/doingg
 #    ls /scratch/$PBS_JOBID

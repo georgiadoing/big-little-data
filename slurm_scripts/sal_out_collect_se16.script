@@ -49,13 +49,9 @@ conda activate Renv
 #../shape_comp/se_rp62a_gene_names.csv \
 #se_rp62a_aureus_comp_cdna_k15.csv
 
-#Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/pandb_b_1282_k15/sra_comp \
-#../shape_comp/pandb_b_1282_gene_names.csv \
-#se_pandb1282_epi_comp_k15.csv
-
-Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/pandb_b_1282_p_k15/sra_comp \
-../shape_comp/pandb_b_1282p_gene_names.csv \
-se_pandb1282p_epi_comp_k15.csv
+Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/se_16_k15/sra_comp \
+../shape_comp/se_16_gene_names.csv \
+se_se16_epi_comp_k15.csv
 
 #Rscript ../shape_comp/quant_collect.R /fastscratch/doingg/salmon/se_atcc12228_rp62a_k15/sra_comp \
 #../shape_comp/se_atcc12228_and_rp62a_gene_names.csv \
