@@ -1,0 +1,996 @@
+---
+title: "S. epi 16 compendium"
+output: powerpoint_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  dev = "png",
+  dpi = 300,
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+```{r, warning=F, message=F, include=F}
+library(librarian)
+shelf(KEGGREST, 
+      EnrichmentBrowser,
+      ComplexHeatmap,
+      circlize,
+      RColorBrewer,
+      DESeq2,
+      #dplyr,
+      kableExtra,
+      corrplot)#,
+      #ggplot2)
+#library(KEGGREST)
+#library(EnrichmentBrowser)
+#library(ComplexHeatmap)
+#library(circlize)
+#library(RColorBrewer)
+#library(DESeq2)
+library(dplyr)
+#library(corrplot)
+
+library(ggpubr)
+library(stringr)
+library(reshape2)
+library(ggprism)
+library(ggplot2)
+```
+
+
+
+
+## Load Run Tables
+
+```{r}
+se_run_table <- read.csv('SraRunTable_Se_st_extra.csv', stringsAsFactors = F)
+sa_run_table <- read.csv('SraRunTable_Sa_st_extra.csv', stringsAsFactors = F)
+```
+
+
+
+## Strains from SRA Run Tables
+
+```{r}
+epi_strain <- table(se_run_table$strain)
+kable(epi_strain[order(epi_strain, decreasing = T)], na.rm=T, 
+      format.args = list(scientific = FALSE), 
+      col.names = c("Strain", "Sample count"), format = "pipe")
+```
+
+
+```{r}
+epi_strain_groups <- table(se_run_table$strain_group)
+kable(epi_strain_groups[order(epi_strain_groups, decreasing = T)], na.rm=T, 
+      format.args = list(scientific = FALSE), 
+      col.names = c("Strain", "Sample count"), format = "pipe")
+```
+
+```{r}
+sau_strain <- table(sa_run_table$strain)
+kable(sau_strain[order(sau_strain, decreasing = T)], na.rm=T, 
+      format.args = list(scientific = FALSE), 
+      col.names = c("Strain", "Sample count"), format = "pipe")
+```
+
+
+```{r}
+sau_strain_groups <- table(sa_run_table$strain_group)
+kable(sau_strain_groups[order(sau_strain_groups, decreasing = T)], na.rm=T, 
+      format.args = list(scientific = FALSE), 
+      col.names = c("Strain", "Sample count"), format = "pipe")
+```
+
+
+## Load annotation files
+
+```{r}
+se_metadata <- read.csv('StudyData.csv', stringsAsFactors = F)
+staph_metadata <- read.csv('StudyData_all_staph_204.csv', stringsAsFactors = F)
+staph_metadata_cl <- read.csv('SampleDataVFF_all_staph.csv', stringsAsFactors = F)
+```
+
+
+```{r}
+staph_metadata_cl$strain <- staph_metadata_cl$Strain
+staph_metadata_cl$strain[sapply(staph_metadata_cl$Strain, function(x) nchar(x)) > 10] <- "other"
+
+staph_metadata_cl$medium <- staph_metadata_cl$Medium
+staph_metadata_cl$medium[sapply(staph_metadata_cl$Medium, function(x) nchar(x)) > 10] <- "other"
+
+```
+
+```{r}
+se_prj <- se_run_table$BioProject
+sa_prj <- sa_run_table$BioProject
+staph_metadata_alt <- staph_metadata_cl
+staph_metadata_alt$PRJNA <- str_extract(staph_metadata_alt$SRA_ID, 
+                                        'PRJNA[0-9]*')
+staph_metadata_alt$species <- sapply(staph_metadata_alt$PRJNA,
+                                     function(x){
+                                       if(x %in% se_prj){
+                                         'S.epi'
+                                       } else if(x %in% sa_prj){
+                                         'S.aur'
+                                       } else{'other'}
+                                     })
+
+table(staph_metadata_alt$species)
+```
+
+
+```{r}
+staph_metadata_alt$agar <- str_detect(staph_metadata_alt$Medium_orig, 'agar') |
+                            str_detect(staph_metadata_alt$Medium_orig, 'TSA') |
+                            str_detect(staph_metadata_alt$Medium_orig, 'iofilm')
+sum(staph_metadata_alt$agar)
+staph_metadata_alt$broth <- str_detect(staph_metadata_alt$Medium_orig, 'agar')|
+                            str_detect(staph_metadata_alt$Medium_orig, 'TSB') |
+                            str_detect(staph_metadata_alt$Medium_orig, 'xponential')|
+                            str_detect(staph_metadata_alt$Medium_orig, 'tationary')
+sum(staph_metadata_alt$broth)
+
+staph_metadata_alt$temp <- str_extract(str_extract(staph_metadata_alt$Medium_orig, 
+                                        ' [0-9][0-9]+[ °]*C[ .]'), '3[07]')
+table(staph_metadata_alt$temp)
+
+staph_metadata_alt$samp_size <- sapply(staph_metadata_alt$SRA_Accession,
+                                       function(x) length(unlist(str_extract_all(x, 'SRX[0-9]*'))))
+
+staph_metadata_alt$year <- sapply(staph_metadata_alt$Date1,
+                                       function(x) str_extract(x, '[0-9][0-9][0-9][0-9]'))
+
+staph_metadata_alt$city <- sapply(staph_metadata_alt$Location2,
+                                       function(x) str_extract(x, '[A-Za-z ]*'))
+table(staph_metadata_alt$city)
+
+staph_metadata_alt$state <- sapply(staph_metadata_alt$Location3,
+                                       function(x) str_extract(x, '[A-Za-z ]*'))
+table(staph_metadata_alt$state)
+
+staph_metadata_alt$country <- sapply(staph_metadata_alt$Location5,
+                                       function(x) str_extract(x, '[A-Za-z ]*'))
+table(staph_metadata_alt$country)
+```
+
+## Make some plots
+
+
+## Sample Size
+
+```{r}
+#colnames(staph_metadata_alt)
+staph_melt <- melt(staph_metadata_alt[,c('Strain',
+                                         'Medium',
+                                         'PRJNA',
+                                         'species',
+                                         'agar',
+                                         'broth',
+                                         'temp',
+                                         'samp_size',
+                                         'year',
+                                         'city',
+                                         'state',
+                                         'country'
+                                         )])
+
+ g <- ggplot(staph_melt, aes(x = value, fill = species)) +
+   geom_histogram(position = position_dodge()) +
+   scale_fill_brewer(palette = "Dark2") +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+
+## Sample size density
+
+```{r}
+ g <- ggplot(staph_melt, aes(x = value, fill = species)) +
+   geom_density(alpha = 0.5) +
+   scale_fill_brewer(palette = "Dark2") +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+
+## Strains
+
+```{r}
+#colnames(staph_metadata_alt)
+staph_melt <- melt(staph_metadata_alt[,c('strain',
+                                         'medium',
+                                         'PRJNA',
+                                         'species',
+                                         'agar',
+                                         'broth',
+                                         'temp',
+                                         'samp_size',
+                                         'year',
+                                         'city',
+                                         'state',
+                                         'country'
+                                         )])
+```
+
+
+```{r}
+
+ g <- ggplot(staph_melt, aes(x = species,  fill = strain)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Spectral",length(unique(staph_melt$strain)))) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+
+
+```{r}
+table(staph_melt$strain,staph_melt$species)
+```
+
+
+## Strains based on Run Tables
+
+```{r}
+se_run_tab_strains <- se_run_table[,c("Run",
+                                      "BioProject" ,
+                                      "strain",
+                                      "strain_group" ,
+                                      "ReleaseDate",
+                                      'Collection_date',
+                                      'source_name',
+                                      'Library.Name',
+                                      'treatment',
+                                      'geo_loc_name')]
+se_run_tab_strains$species = "S.epi"
+sa_run_tab_strains <- sa_run_table[,c("Run",
+                                      "BioProject" ,
+                                      "strain",
+                                      "strain_group" ,
+                                      "ReleaseDate",
+                                      'Collection_date',
+                                      'source_name',
+                                      'Library.Name',
+                                      'treatment',
+                                      'geo_loc_name')]
+sa_run_tab_strains$species = "S.aur"
+
+run_tab_strains <- rbind(se_run_tab_strains,sa_run_tab_strains)
+```
+
+
+```{r}
+run_tab_strains$anns <- run_tab_strains$BioProject %in% staph_metadata_alt$PRJNA
+table(run_tab_strains$anns, run_tab_strains$species)
+```
+
+```{r}
+run_tab_strains_grouped <- run_tab_strains %>% 
+  group_by(strain_group, species, BioProject, anns) %>%
+  summarise(n=n())
+```
+
+
+
+## Strain groups
+
+
+```{r}
+ g <- ggplot(run_tab_strains_grouped, aes(x = species,  fill = strain_group)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Spectral",length(unique(run_tab_strains_grouped$n)))) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+
+## Strain groups by annotations
+
+```{r}
+ g <- ggplot(run_tab_strains_grouped, aes(x = species,  fill = strain_group)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Spectral",length(unique(run_tab_strains_grouped$n)))) +
+  facet_wrap(~anns) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+
+## Media
+
+
+```{r}
+
+ g <- ggplot(staph_melt, aes(x = species,  fill = medium)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Spectral",length(unique(staph_melt$strain)))) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+
+
+```{r}
+table(staph_melt$medium,staph_melt$species)
+```
+
+
+
+## biofilm
+
+
+```{r}
+
+ g <- ggplot(staph_melt, aes(x = species,  fill = agar)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Dark2",length(unique(staph_melt$agar)))) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+## Broth
+
+
+```{r}
+
+ g <- ggplot(staph_melt, aes(x = species,  fill = broth)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Dark2",length(unique(staph_melt$broth)))) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+```{r}
+table(staph_melt$broth,staph_melt$species)
+```
+
+## Place
+
+```{r}
+
+ g <- ggplot(staph_melt, aes(x = species,  fill = country)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Dark2",length(unique(staph_melt$country)))) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+```{r}
+table(staph_melt$country,staph_melt$species)
+```
+
+
+## Dates
+
+```{r}
+
+ g <- ggplot(staph_melt, aes(x = species,  fill = year)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Dark2",length(unique(staph_melt$year)))) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+```{r}
+table(staph_melt$year,staph_melt$species)
+```
+
+
+## Temp
+
+
+```{r}
+
+ g <- ggplot(staph_melt, aes(x = species,  fill = temp)) +
+   geom_bar() +
+   scale_fill_manual(values = get_palette("Dark2",length(unique(staph_melt$temp)))) +
+   theme_bw() +
+   theme_prism()
+ g
+ 
+```
+
+```{r}
+table(staph_melt$temp,staph_melt$species)
+```
+
+## Heatmaps
+
+
+## Load data
+```{r}
+sa_counts_norm01 <- read.csv('sa_NCTC3825_filt_norm_log_01.csv', stringsAsFactors = F)
+se_counts_norm01 <- read.csv('se_pandb1282_epi_comp_log_counts_norm_01.csv', stringsAsFactors = F)
+sa_counts_se16_norm01 <- read.csv('se_MAPPED_sa_NCTC3825_filt_norm_log_01.csv', stringsAsFactors = F)
+se_counts_se16_norm01 <- read.csv('se_se16_epi_comp_log_counts_norm_01.csv', stringsAsFactors = F)
+sa_counts_mapped_norm01 <- read.csv('sepandb1282_MAPPED_sa_NCTC3825_filt_norm_log_01.csv', stringsAsFactors = F)
+
+```
+
+## Load Run Tables
+
+```{r}
+sa_run_table <- read.csv('SraRunTable_Sa_st_extra.csv', stringsAsFactors = F)
+se_run_table <- read.csv('SraRunTable_Se_st_extra.csv', stringsAsFactors = F)
+
+```
+
+## Load operons
+```{r}
+operons <- read.csv('conserved_operon.download.txt', sep='\t', stringsAsFactors = F)
+sa_opes <- operons[operons$org == '158879',] # n315 158879  nctc 8325 93061
+se_opes <- operons[operons$org == '176280',]
+```
+
+
+## Make some heatmaps
+```{r}
+
+sa_studies <- sapply(colnames(sa_counts_norm01)[-c(1)], function(x) 
+  sa_run_table$SRA.Study[sa_run_table$Experiment == x][1])
+
+sa_strains <- sapply(colnames(sa_counts_norm01)[-c(1)], function(x) 
+  sa_run_table$strain_group[sa_run_table$Experiment == x][1])
+
+se_studies <- sapply(colnames(se_counts_norm01)[-c(1)], function(x) 
+  se_run_table$SRA.Study[se_run_table$Experiment == x][1])
+
+se_strains <- sapply(colnames(se_counts_norm01)[-c(1)], function(x) 
+  se_run_table$strain_group[se_run_table$Experiment == x][1])
+
+
+se_studies[is.na(se_studies)] <- 'SRPspotornaseq'
+se_strains[se_studies == 'SRPspotornaseq'] <- 'Tu3298'
+#se_studies <- se_studies[-c((c(1:79) * 2) + 31)]
+
+```
+
+
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_log_counts <- sa_counts_norm01[,-c(1)]
+
+col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),((length(unique(sa_studies)) / 8)+1) )[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+ann_colors <- rep(brewer.pal(6,'Greys'),40)[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+ha <- HeatmapAnnotation(study = sa_studies, 
+                        strain = sa_strains,
+                        show_legend = c(F,T), 
+                        annotation_name_side = "left",
+                        col = list( study = ann_colors, 
+                                                     strain = st_colors))
+
+h <- Heatmap(sa_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+pdf('plots/saNCTC8325_heatmap_strain_study_anns.pdf', height=6, width=12)
+h
+dev.off()
+
+```
+
+
+
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=12}
+sa_log_counts <- sa_counts_mapped_norm01[,-c(1)]
+
+col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),((length(unique(sa_studies)) / 8)+1) )[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+ha <- HeatmapAnnotation(study = sa_studies, 
+                        strain = sa_strains,
+                        show_legend = c(F,T), 
+                        annotation_name_side = "left",
+                        col = list( study = ann_colors, 
+                                                     strain = st_colors))
+
+h <- Heatmap(sa_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(6,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             )
+#h
+#pdf('plots/se_comp_genes_panDB1282_mapped_strain_study_anns.pdf', height=6, width=12)
+#h
+#dev.off()
+```
+
+
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+se_log_counts <- se_counts_norm01[,-c(1)]
+
+
+col_fun = colorRamp2(c(min(se_log_counts), median(data.matrix(se_log_counts)), max(se_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_studies))]
+
+ann_colors <- rep(brewer.pal(6,'Greys'),4)[1:length(unique(se_studies))]
+names(ann_colors) <- unique(se_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_strains))]
+names(st_colors) <- unique(se_strains)
+
+ha <- HeatmapAnnotation(study = se_studies, 
+                        strain = se_strains,
+                        show_legend = c(F,T), 
+                        annotation_name_side = "left",
+                        col = list( study = ann_colors, 
+                                                     strain = st_colors))
+
+h <- Heatmap(se_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+pdf('plots/sepandb1282_heatmap_strain_study_anns.pdf', height=6, width=12)
+h
+dev.off()
+```
+
+## Heatmaps media
+
+```{r}
+
+sa_media <- sapply(colnames(sa_counts_norm01)[-c(1)], function(x){
+  prj_temp <- sa_run_table$BioProject[sa_run_table$Experiment == x][1]
+  staph_melt$Medium[staph_melt$PRJNA == prj_temp][1]
+}
+  )
+
+sa_media[nchar(sa_media) > 100] <- "OTHER"
+sa_media[is.na(sa_media)] <- "NA"
+sa_media[sa_media == ""] <- "OTHER"
+
+se_media <- sapply(colnames(se_counts_norm01)[-c(1)], function(x){
+  prj_temp <- se_run_table$BioProject[se_run_table$Experiment == x][1]
+  staph_melt$Medium[staph_melt$PRJNA == prj_temp][1]
+}
+  )
+
+se_media[is.na(se_studies)] <- 'SRPspotornaseq'
+se_media[se_media == 'SRPspotornaseq'] <- 'TSB'
+
+se_media[nchar(se_media) > 100] <- "OTHER"
+se_media[is.na(se_media)] <- "NA"
+se_media[se_media == ""] <- "OTHER"
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_log_counts <- sa_counts_norm01[,-c(1)]
+
+col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),((length(unique(sa_studies)) / 8)+1) )[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+ann_colors <- rep(brewer.pal(6,'Greys'),40)[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+m_colors <- rep(brewer.pal(8,'Dark2'),2)[1:length(unique(c(sa_media, se_media)))]
+names(m_colors) <- unique(c(sa_media, se_media))
+m_colors["NA"] <- "white"
+
+ha <- HeatmapAnnotation(study = sa_studies, 
+                        media = sa_media,
+                        show_legend = c(F,T), 
+                        col = list( study = ann_colors,
+                                    media = m_colors
+                                    
+                                                     ))
+
+h <- Heatmap(sa_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+h
+
+pdf('plots/saNCTC8325_heatmap_strain_study_anns.pdf', height=6, width=12)
+h
+dev.off()
+
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+se_log_counts <- se_counts_norm01[,-c(1)]
+
+
+col_fun = colorRamp2(c(min(se_log_counts), median(data.matrix(se_log_counts)), max(se_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_studies))]
+
+ann_colors <- rep(brewer.pal(6,'Greys'),4)[1:length(unique(se_studies))]
+names(ann_colors) <- unique(se_studies)
+
+
+
+ha <- HeatmapAnnotation(study = se_studies, 
+                        media = se_media,
+                        show_legend = c(F,T), 
+                        col = list( study = ann_colors,
+                                    media = m_colors))
+
+h <- Heatmap(se_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+h
+pdf('plots/sepandb1282_heatmap_strain_study_anns.pdf', height=6, width=12)
+h
+dev.off()
+```
+
+
+## Heatmaps temp
+
+```{r}
+
+sa_temp <- sapply(colnames(sa_counts_norm01)[-c(1)], function(x){
+  prj_temp <- sa_run_table$BioProject[sa_run_table$Experiment == x][1]
+  staph_melt$temp[staph_melt$PRJNA == prj_temp][1]
+}
+  )
+
+sa_temp[is.na(sa_temp)] <- "NA"
+
+
+se_temp <- sapply(colnames(se_counts_norm01)[-c(1)], function(x){
+  prj_temp <- se_run_table$BioProject[se_run_table$Experiment == x][1]
+  staph_melt$temp[staph_melt$PRJNA == prj_temp][1]
+}
+  )
+se_temp[is.na(se_temp)] <- "NA"
+
+se_temp[is.na(se_studies)] <- 'SRPspotornaseq'
+se_temp[se_media == 'SRPspotornaseq'] <- '37'
+
+
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_log_counts <- sa_counts_norm01[,-c(1)]
+
+col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),((length(unique(sa_studies)) / 8)+1) )[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+ann_colors <- rep(brewer.pal(6,'Greys'),40)[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+m_colors <- rep(brewer.pal(8,'Dark2'),2)[1:length(unique(c(sa_media, se_media)))]
+names(m_colors) <- unique(c(sa_media, se_media))
+m_colors["NA"] <- "white"
+
+t_colors <- rep(brewer.pal(8,'Dark2'),2)[1:length(unique(c(sa_temp, se_temp)))]
+names(t_colors) <- unique(c(sa_temp, se_temp))
+t_colors['NA'] <- "white"
+
+ha <- HeatmapAnnotation(study = sa_studies, 
+                        media = sa_media,
+                        temp = sa_temp,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    media = m_colors,
+                                    temp = t_colors 
+                                    ))
+
+h <- Heatmap(sa_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+h
+
+#pdf('plots/saNCTC8325_heatmap_strain_study_anns.pdf', height=6, width=12)
+#h
+#dev.off()
+
+```
+
+## Heatmaps biofilm
+
+```{r}
+
+sa_bf <- sapply(colnames(sa_counts_norm01)[-c(1)], function(x){
+  prj_temp <- sa_run_table$BioProject[sa_run_table$Experiment == x][1]
+  staph_melt$agar[staph_melt$PRJNA == prj_temp][1]
+}
+  )
+
+sa_bf[is.na(sa_bf)] <- "NA"
+
+
+se_bf <- sapply(colnames(se_counts_norm01)[-c(1)], function(x){
+  prj_temp <- se_run_table$BioProject[se_run_table$Experiment == x][1]
+  staph_melt$agar[staph_melt$PRJNA == prj_temp][1]
+}
+  )
+se_bf[is.na(se_bf)] <- "NA"
+
+se_bf[is.na(se_studies)] <- 'SRPspotornaseq'
+se_bf[se_bf == 'SRPspotornaseq'] <- 'FALSE'
+
+
+
+sa_broth <- sapply(colnames(sa_counts_norm01)[-c(1)], function(x){
+  prj_temp <- sa_run_table$BioProject[sa_run_table$Experiment == x][1]
+  staph_melt$broth[staph_melt$PRJNA == prj_temp][1]
+}
+  )
+
+sa_broth[is.na(sa_broth)] <- "NA"
+
+
+se_broth <- sapply(colnames(se_counts_norm01)[-c(1)], function(x){
+  prj_temp <- se_run_table$BioProject[se_run_table$Experiment == x][1]
+  staph_melt$broth[staph_melt$PRJNA == prj_temp][1]
+}
+  )
+se_broth[is.na(se_broth)] <- "NA"
+
+se_broth[is.na(se_studies)] <- 'SRPspotornaseq'
+se_broth[se_broth == 'SRPspotornaseq'] <- 'TRUE'
+
+
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_log_counts <- sa_counts_norm01[,-c(1)]
+
+col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),((length(unique(sa_studies)) / 8)+1) )[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+ann_colors <- rep(brewer.pal(6,'Greys'),40)[1:length(unique(sa_studies))]
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+m_colors <- rep(brewer.pal(8,'Dark2'),2)[1:length(unique(c(sa_media, se_media)))]
+names(m_colors) <- unique(c(sa_media, se_media))
+m_colors["NA"] <- "white"
+
+t_colors <- rep(brewer.pal(8,'Dark2'),2)[1:length(unique(c(sa_temp, se_temp)))]
+names(t_colors) <- unique(c(sa_temp, se_temp))
+t_colors['NA'] <- "white"
+
+a_colors <- rep(brewer.pal(8,'Dark2'),2)[1:length(unique(c(sa_bf, se_bf)))]
+names(a_colors) <- unique(c(sa_bf, se_bf))
+a_colors['NA'] <- "white"
+
+b_colors <- rep(brewer.pal(8,'Dark2'),2)[1:length(unique(c(sa_broth, se_broth)))]
+names(b_colors) <- unique(c(sa_broth, se_broth))
+b_colors['NA'] <- "white"
+
+ha <- HeatmapAnnotation(study = sa_studies, 
+                        strain = sa_strains,
+                        media = sa_media,
+                        temp = sa_temp,
+                        agar = sa_bf,
+                        broth = sa_broth,
+                        show_legend = c(F,T,T,T,T,T), 
+                        annotation_name_side = "left",
+                        col = list( study = ann_colors,
+                                    strain = st_colors,
+                                    media = m_colors,
+                                    temp = t_colors,
+                                    agar = a_colors,
+                                    broth = b_colors
+                                    ))
+
+h <- Heatmap(sa_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             
+             column_names_gp = gpar(fontsize=0),
+             )
+h
+
+pdf('plots/saNCTC8325_heatmap_strain_study_media_temp_agar_broth_anns.pdf', height=6, width=14)
+h
+dev.off()
+
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+se_log_counts <- se_counts_norm01[,-c(1)]
+
+
+col_fun = colorRamp2(c(min(se_log_counts), median(data.matrix(se_log_counts)), max(se_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_studies))]
+
+ann_colors <- rep(brewer.pal(6,'Greys'),4)[1:length(unique(se_studies))]
+names(ann_colors) <- unique(se_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_strains))]
+names(st_colors) <- unique(se_strains)
+
+ha <- HeatmapAnnotation(study = se_studies, 
+                        strain = se_strains,
+                        media = se_media,
+                        temp = se_temp,
+                        agar = se_bf,
+                        broth = se_broth,
+                        annotation_name_side = "left",
+                        show_legend = c(F,T,T,T,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors,
+                                    media = m_colors,
+                                    temp = t_colors,
+                                    agar = a_colors,
+                                    broth = b_colors
+                                    ))
+
+h <- Heatmap(se_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+pdf('plots/sepandb1282_heatmap_strain_study_media_temp_agar_broth_anns.pdf', height=6, width=14)
+h
+dev.off()
+```
+
+
+```{r}
+dim(sa_counts_norm01)
+```
+
+```{r}
+dim(se_counts_norm01)
+```
+
+
+```{r}
+length(unique(se_run_table$strain))
+length(unique(se_run_table$strain_group))
+
+length(unique(sa_run_table$strain))
+length(unique(sa_run_table$strain_group))
+
+nrow(se_run_table)
+nrow(sa_run_table)
+
+length(unique(se_run_table$strain_group)) / nrow(se_run_table)
+length(unique(sa_run_table$strain_group)) / nrow(sa_run_table)
+
+length(unique(se_run_table$strain)) / nrow(se_run_table)
+length(unique(sa_run_table$strain)) / nrow(sa_run_table)
+```
+
+```{r}
+
+```
+
