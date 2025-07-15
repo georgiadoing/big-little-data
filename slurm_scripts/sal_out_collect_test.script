@@ -1,0 +1,31 @@
+#!/bin/bash -l
+
+################################################################################
+#Script Name: sal_out_collect.pbs
+#Desription : collect salmon output into matrices
+#Args       : dir, genome, outfile suffix
+#Author     : Georgia Doing
+#Date       : 04-13-25
+#Email      : georgia.doing@duke.edu
+################################################################################
+
+
+##SBATCH --account NCCC
+#SBATCH --job-name=sal_out_col
+#SBATCH --time=02:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
+#SBATCH --mail-user=georgia.doing@duke.edu
+
+
+
+
+cd $SLURM_SUBMIT_DIR
+
+conda activate Renv
+
+
+Rscript ../shape_comp/quant_collect.R /work/gd134/comp_temp/salmon/ecoli_pan_genome_k15/ecoli_comp_test \
+../shape_comp/ecoli_pan_genome_gene_names.csv \
+ecoli_pan_genome_test_comp_k15.csv
+

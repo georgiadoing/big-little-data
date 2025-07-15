@@ -1,0 +1,21 @@
+#!/bin/bash -l
+
+################################################################################
+#Script Name: run_table_Sa_2024_02_07.script
+#Desription : create dirs from run table
+#Args       : None 
+#Author     : Georgia Doing
+#Date       : 02-07-2024
+#Email      : Georgia.Doing@JAX.org
+################################################################################
+
+##SBATCH --account doingg
+#SBATCH --job-name=sal_ti
+#SBATCH --time=02:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
+##PBS -m bea
+#SBATCH --mail-user=Georgia.Doing@JAX.org
+
+cd $SLURM_SUBMIT_DIR
+Rscript ../run_table/run_table_dirs.R ../run_table/SraRunTable_Sa_rna_2024_02_07.csv ../run_table/saur_comp_2024_02_07
