@@ -25,15 +25,16 @@
 ## ---------------------------
 library(R.utils)
 
-args = commandArgs(trailingOnly=TRUE)
-
+args = base::commandArgs(trailingOnly=TRUE)
+print(args[1])
+print(args[2])
 # test if there is at least one argument: if not, return an error
 if (length(args)==0) {
   stop("At least one argument must be supplied SraRunTable.csv", call.=FALSE)
 }
 # load in SraRunTable from the first argument
 run_table <- read.csv(args[1], stringsAsFactors = F)
-mkdirs('./test/')
+#mkdirs(args[1]) # './test'
 #id $SLURM_SUBMIT_DIR
 
 #conda activate salmon
@@ -44,11 +45,14 @@ mkdirs('./test/')
 # where leaf dirs contain txt files of run accessions
 print(colnames(run_table))
 lapply(unique(run_table$SRA.Study), function(study){
+  print(study)
   sdir <- paste(paste('.',args[2],sep='/'),study, sep='/')
+  print(sdir)
   mkdirs(sdir)
   exps <- unique(run_table$Experiment[run_table$SRA.Study == study])
   lapply(exps, function(exp){
     edir <- paste(sdir, exp, sep='/')
+    print(edir)
     mkdirs(edir)
     rns <- unique(run_table$Run[run_table$Experiment == exp])
     erns <- file(paste(paste(edir,exp,sep='/'), '.txt',sep=''))
