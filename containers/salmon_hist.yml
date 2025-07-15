@@ -1,0 +1,8 @@
+name: salmon
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - salmon
+prefix: /home/doingg/anaconda3/envs/salmon
