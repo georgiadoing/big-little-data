@@ -527,7 +527,7 @@ sa_log_counts <- sa_counts_mapped_norm01[,-c(1)]
 col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
 
 
-ann_colors <- rep(brewer.pal(8,'Dark2'),((length(unique(sa_studies)) / 8)+1) )[1:length(unique(sa_studies))]
+ann_colors <- rep(brewer.pal(6,'Greys'),40)[1:length(unique(sa_studies))]
 names(ann_colors) <- unique(sa_studies)
 
 st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
@@ -553,7 +553,7 @@ h <- Heatmap(sa_log_counts, col = col_fun,
              column_names_gp = gpar(fontsize=6),
              )
 #h
-pdf('plots/se_comp_genes_panDB1282_mapped_strain_study_anns.pdf', height=12, width=12)
+pdf('plots/sa_comp_NCTC8325_panDB1282_mapped_strain_study_anns.pdf', height=6, width=12)
 h
 dev.off()
 ```
