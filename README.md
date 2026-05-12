@@ -41,7 +41,7 @@ Load the conda environment: micro-seq-comp_wR.yml
 
 ## Support
 
-georgia.doing@jax.org
+georgia.doing@gmail.com
 
 ## Roadmap
 
