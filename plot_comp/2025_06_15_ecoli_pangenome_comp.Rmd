@@ -32,7 +32,7 @@ shelf(KEGGREST,
       reshape2,
       readxl,
       ggprism,
-      
+      osfr,
       readr,
       flextable)
 #library(KEGGREST)
@@ -44,17 +44,25 @@ shelf(KEGGREST,
 #library(dplyr)
 #library(corrplot)
 #library(ggplot2)
-library(flextable)
+#library(flextable)
 
 ```
 
 ## Load data
 
 ```{r}
+#osfc <- osf_retrieve_node("https://osf.io/j4x63")
+#osf_files <- osf_ls_files(osfc)
+#osf_download(osf_files[])
+```
 
-ec_counts <- read.csv('num_reads_ecoli_pan_genome_part2_comp_ref_k15v3.csv', stringsAsFactors = F)
+```{r}
+
+ec_counts <- read.csv('../compendia/num_reads_ecoli_pan_genome_part2_comp_ref_k15v3.csv', stringsAsFactors = F)
 colnames(ec_counts)[c(4:ncol(ec_counts))] <- sapply(colnames(ec_counts)[c(4:ncol(ec_counts))],
                                                     function(x) str_extract(x, "[A-Z0-9a-z]*"))
+
+
 ```
 
 Progress --
@@ -76,7 +84,7 @@ flextable::width(ft_1, width = dim_pretty(ft_1)[[1]])
 ## Load Run Tables
 
 ```{r}
-ec_run_table_xtra <- read_excel('Ecoli_GEO_strains_working_v1.xlsx', sheet = 1 )
+ec_run_table_xtra <- read_excel('../compendia/Ecoli_GEO_strains_working_v1.xlsx', sheet = 1 )
 ec_run_table_xtra <- ec_run_table_xtra[-1,]
 rownames(ec_run_table_xtra) <- ec_run_table_xtra$strain_value
 
@@ -85,11 +93,13 @@ fix <- !(ec_run_table_xtra$`Emily strain groups` == "OK")
 fix[is.na(fix)] <- FALSE
 ec_run_table_xtra$strain_checked[fix] <- ec_run_table_xtra$`Emily strain groups`[fix]
 
-ec_run_table_acc <- read_excel('Ecoli_GEO_strains_working_v1.xlsx', sheet = 2 )
+ec_run_table_acc <- read_excel('../compendia/Ecoli_GEO_strains_working_v1.xlsx', sheet = 2 )
 ec_run_table_acc <- ec_run_table_acc[-1,]
 
 
-ec_run_table <- read.csv('SraRunTable_Ec_04_29_25.csv', stringsAsFactors = F)
+ec_run_table <- read.csv('../compendia/SraRunTable_Ec_04_29_25.csv', stringsAsFactors = F)
+
+ec_counts <- ec_counts[,colnames(ec_counts) %in% c("X",ec_run_table$Experiment)]
 
 ec_run_table$ann_merge <- apply(ec_run_table[c("Organism", "strain",
                                                "substrain", "genotype",
@@ -170,12 +180,12 @@ sum(rowSums(ec_counts[,-c(1,2,3)]) < 150)
 col_fun = colorRamp2(c(min(ec_log_counts), median(data.matrix(ec_log_counts)), max(ec_log_counts)), c("grey", "#E7D4E8", "#762A83"))
 
 
-ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(ec_studies))]
+ann_colors <- rep(brewer.pal(8,'Dark2'),161)[1:length(unique(ec_studies))]
 
-ann_colors <- rep(brewer.pal(6,'Greys'),15)[1:length(unique(ec_studies))]
+ann_colors <- rep(brewer.pal(6,'Greys'),215)[1:length(unique(ec_studies))]
 names(ann_colors) <- unique(ec_studies)
 
-st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(ec_strains))]
+st_colors <- rep(brewer.pal(8,'Dark2'),7)[1:length(unique(ec_strains))]
 names(st_colors) <- unique(ec_strains)
 
 ha <- HeatmapAnnotation(study = ec_studies, 
@@ -196,7 +206,7 @@ h <- Heatmap(ec_log_counts, col = col_fun,
              ),
              column_names_gp = gpar(fontsize=0),
              )
-#h
+h
 #png('plots/ec_comp_test.png', height=3, width=6)
 #h
 #dev.off()

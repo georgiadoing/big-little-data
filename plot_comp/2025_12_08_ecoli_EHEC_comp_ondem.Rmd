@@ -1,5 +1,5 @@
 ---
-title: "Ecoli Pangenome Compendium - full filt"
+title: "Ecoli Pangenome Compendium - full filt - ondemand kernel"
 output: powerpoint_presentation
 date: "2025-06-16"
 ---
@@ -20,21 +20,20 @@ knitr::opts_chunk$set(
 ```{r, warning=F, message=F, include=F}
 library(librarian)
 shelf(KEGGREST, 
-#      EnrichmentBrowser,
+      EnrichmentBrowser,
       ComplexHeatmap,
       circlize,
       RColorBrewer,
       DESeq2,
-#      dplyr,
-#      corrplot,
+      dplyr,
+      corrplot,
       ggplot2,
       stringr,
       reshape2,
       readxl,
       ggprism,
-      matrixStats,
-#      
-#      readr,
+      osfr,
+      readr,
       flextable)
 #library(KEGGREST)
 #library(EnrichmentBrowser)
@@ -46,15 +45,49 @@ shelf(KEGGREST,
 #library(corrplot)
 #library(ggplot2)
 #library(flextable)
-#library(KEGGREST)
+
 ```
 
 ## Load data
 
 ```{r}
+#osfc <- osf_retrieve_node("https://osf.io/j4x63")
+#osf_files <- osf_ls_files(osfc)
+#osf_download(osf_files[])
+```
+
+```{r}
 
 ec_counts <- read.csv('../compendia/num_reads_ecoli_pan_genome_part2_comp_ref_k15v3.csv', stringsAsFactors = F)
+colnames(ec_counts)[c(4:ncol(ec_counts))] <- sapply(colnames(ec_counts)[c(4:ncol(ec_counts))],
+                                                    function(x) str_extract(x, "[A-Z0-9a-z]*"))
 
+
+```
+
+```{r}
+gpa <- read.csv('ecoli_pan_genomev3_gene_presence_absence_ann.csv', stringsAsFactors = F)
+
+sum(!is.na(gpa$MG1655))
+
+mg1655_genes <- gpa$first_name_comp[!is.na(gpa$MG1655) ]
+ehec_genes <- gpa$first_name_comp[!is.na(gpa$O157_H7_EHEC) ]
+bl21_genes <- gpa$first_name_comp[!is.na(gpa$BL21_DE3) ]
+upec_genes <- gpa$first_name_comp[!is.na(gpa$UPEC_536) ]
+
+
+plus_genes <- unique(c(mg1655_genes,ehec_genes)) # ,bl21_genes
+sum(ec_counts$X %in% plus_genes)
+
+plus_genes <- unique(c(mg1655_genes)) # ,bl21_genes
+sum(ec_counts$X %in% plus_genes)
+
+plus_genes <- unique(c(ehec_genes)) # ,bl21_genes
+sum(ec_counts$X %in% plus_genes)
+
+
+
+ec_counts <- ec_counts[ec_counts$X %in% plus_genes,]
 ```
 
 Progress --
@@ -76,7 +109,7 @@ flextable::width(ft_1, width = dim_pretty(ft_1)[[1]])
 ## Load Run Tables
 
 ```{r}
-ec_run_table_xtra <- read_excel('Ecoli_GEO_strains_working_v1.xlsx', sheet = 1 )
+ec_run_table_xtra <- read_excel('../compendia/Ecoli_GEO_strains_working_v1.xlsx', sheet = 1 )
 ec_run_table_xtra <- ec_run_table_xtra[-1,]
 rownames(ec_run_table_xtra) <- ec_run_table_xtra$strain_value
 
@@ -85,11 +118,13 @@ fix <- !(ec_run_table_xtra$`Emily strain groups` == "OK")
 fix[is.na(fix)] <- FALSE
 ec_run_table_xtra$strain_checked[fix] <- ec_run_table_xtra$`Emily strain groups`[fix]
 
-ec_run_table_acc <- read_excel('Ecoli_GEO_strains_working_v1.xlsx', sheet = 2 )
+ec_run_table_acc <- read_excel('../compendia/Ecoli_GEO_strains_working_v1.xlsx', sheet = 2 )
 ec_run_table_acc <- ec_run_table_acc[-1,]
 
 
-ec_run_table <- read.csv('SraRunTable_Ec_04_29_25.csv', stringsAsFactors = F)
+ec_run_table <- read.csv('../compendia/SraRunTable_Ec_04_29_25.csv', stringsAsFactors = F)
+
+ec_counts <- ec_counts[,colnames(ec_counts) %in% c("X",ec_run_table$Experiment)]
 
 ec_run_table$ann_merge <- apply(ec_run_table[c("Organism", "strain",
                                                "substrain", "genotype",
@@ -126,26 +161,26 @@ ec_run_table$strain_put <- sapply(ec_run_table$strain_ann, function(x){
 })
 ```
 
+
 number of files: `r dim(ec_run_table)[1]`
 
 potential samples: `r length(unique(ec_run_table$Experiment))`
 
-unique studies: `r length(unique(ec_run_table$SRA.Study)`
+unique studies: `r length(unique(ec_run_table$SRA.Study))`
 
 samples with high confidence strain: `r sum(ec_run_table$strain_confidence)`
 
 samples with putative strain: `r sum(!ec_run_table$strain_put == 'unknown')`
 
+
 ## Data frames
 
 ```{r}
 ec_studies <- sapply(colnames(ec_counts)[-c(1,2,3)], function(x) 
-  ec_run_table$SRA.Study[ec_run_table$Experiment == str_extract(x, '[ES]RX[0-9]*')][1])
-ec_studies[is.na(ec_studies)] <- "NA"
+  ec_run_table$SRA.Study[ec_run_table$Experiment == x][1])
 
 ec_strains <- sapply(colnames(ec_counts)[-c(1,2,3)], function(x) 
-  ec_run_table$strain_put[ec_run_table$Experiment == str_extract(x, '[ES]RX[0-9]*')][1])
-ec_strains[is.na(ec_strains)] <- "NA"
+  ec_run_table$strain_put[ec_run_table$Experiment == x][1])
 ```
 
 experiments processed so far: `r length(unique(ec_studies))`
@@ -155,57 +190,80 @@ strains in current selection: `r length(unique(ec_strains))`
 ## Se initital heatmap: decide visualization threshold
 
 ```{r, warning=F, message=F,, fig.width=12, fig.height=6}
-ec_log_counts <- log(ec_counts[,-c(1,2,3)] + 1)
+hist(log10(rowSums(ec_counts[,-c(1,2,3)])))
 
-sum(rowSums(ec_counts[,-c(1,2,3)] == 0, na.rm=T) < 19000 )
+ec_log_counts <- log10(ec_counts[,-c(1,2,3)] + 1)
 
-hist((rowSums(ec_counts[,-c(1,2,3)] == 0, na.rm=T) ))
+hist(log10(rowSums(ec_log_counts)))
 ```
 
 
-```{r, warning=F, message=F,, fig.width=12, fig.height=6}
-
-
-hist(log(rowSums(ec_counts[,-c(1,2,3)])))
+```{r}
+sum(rowSums(ec_counts[,-c(1,2,3)]) < 2)
 ```
 
 
-
-```{r, warning=F, message=F,, fig.width=12, fig.height=6}
-
-goi <- rowSums(ec_counts[,-c(1,2,3)] == 0, na.rm=T) < 19000 
-
-
-
-hist(log(rowSums(ec_counts[goi,-c(1,2,3)])))
-```
-
-
-
-## Se initital heatmap - 0 count genes trimmed
-
-```{r, warning=F, message=F,, fig.width=12, fig.height=6}
-
-ec_counts_t <- ec_counts[rowSums(ec_counts[goi,-c(1,2,3)]) > exp(18),-c(1,2,3)]
-
-ec_log_counts <- log(ec_counts_t + 1)
-
-
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
 col_fun = colorRamp2(c(min(ec_log_counts), median(data.matrix(ec_log_counts)), max(ec_log_counts)), c("grey", "#E7D4E8", "#762A83"))
 
-ann_colors <- rep(brewer.pal(6,'Greys'),214)[1:length(unique(ec_studies))]
+rows_sel <- sample(c(1:nrow(ec_counts)), 500)
+
+study_select <- sample(unique(ec_studies),100)
+cols_sel <- ec_studies %in% study_select
+ec_log_counts_temp <- ec_log_counts[rows_sel, cols_sel]
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),161)[1:length(unique(ec_studies))]
+
+ann_colors <- rep(brewer.pal(6,'Greys'),215)[1:length(unique(ec_studies))]
 names(ann_colors) <- unique(ec_studies)
-st_colors <- rep(brewer.pal(8,'Dark2'),6)[1:length(unique(ec_strains))]
+
+st_colors <- rep(brewer.pal(8,'Dark2'),7)[1:length(unique(ec_strains))]
 names(st_colors) <- unique(ec_strains)
 
-ha <- HeatmapAnnotation(study = ec_studies[c(1:1000)], 
-                        strain = ec_strains[c(1:1000)],
+ha <- HeatmapAnnotation(study = ec_studies[cols_sel], 
+                        strain = ec_strains[cols_sel],
+                        show_legend = c(F,T), 
+                        col = list( study = ann_colors, 
+                                    strain = st_colors))
+
+h <- Heatmap(ec_log_counts_temp, col = col_fun, 
+             top_annotation = ha,
+             height = unit(2,"in"),
+             width = unit(3,"in"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+h
+#png('plots/ec_comp_test.png', height=3, width=6)
+#h
+#dev.off()
+
+```
+
+
+## Resize
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
+
+
+#rows_sel <- sample(c(1:nrow(ec_counts)), 100)
+#cols_sel <- sample(c(1:ncol(ec_counts)), 100)
+#ec_log_counts_temp <- ec_log_counts[rows_sel, cols_sel]
+
+ha <- HeatmapAnnotation(study = ec_studies[cols_sel], 
+                        strain = ec_strains[cols_sel],
                         show_legend = c(F,T), 
                         annotation_name_side = "left",
                         col = list( study = ann_colors, 
                                     strain = st_colors))
 
-h <- Heatmap(ec_log_counts[,c(1:1000)], col = col_fun, 
+h <- Heatmap(ec_log_counts[rows_sel, cols_sel], col = col_fun, 
              top_annotation = ha,
              height = unit(8,"cm"),
              width = unit(24,"cm"),
@@ -232,73 +290,158 @@ draw(h,heatmap_legend_side = "bottom")
 #h
 #dev.off()
 ```
-## Gene annotations
 
-```{r}
 
+## Se initital heatmap - low count genes trimmed
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+trim_sel <- rownames(ec_counts)[rowSums(ec_counts[,-c(1,2,3)]) > 10000]
+ec_counts_t <- ec_counts[trim_sel,-c(1,2,3)] #exp(15)
+
+
+ec_log_counts_t <- log10(ec_counts_t + 1)
+
+hist(rowSums(ec_log_counts_t))
+
+hist(log10(rowSums(ec_log_counts_t)))
+
+dim(ec_counts)
+dim(ec_log_counts_t)
 ```
 
 
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
+
+
+
+h <- Heatmap(ec_log_counts[intersect(rows_sel, trim_sel), cols_sel], col = col_fun, 
+             top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             show_row_names = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+            # legend_height = unit(8,"cm"),
+            legend_direction = "horizontal",
+            legend_width = unit(8,"cm"),
+             #gap = unit(1,"cm"),
+             title_position = "topcenter" #  leftcenter-rot
+             ),
+             
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+
+#png('plots/Se_comp_trimmed.png', height=12, width=36, unit = "cm", res = 75)
+draw(h,heatmap_legend_side = "bottom")
+#dev.off()
+
+#pdf('plots/se_comp_genes_se16_mapped_no_spo_dups_small.pdf', height=3, width=6)
+#h
+#dev.off()
+```
+
+
+## Subset of more highly expressed genes
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
+
+
+
+rows_sel_high <- sample(trim_sel, 100)
+
+
+
+h <- Heatmap(ec_log_counts[rows_sel_high, cols_sel], col = col_fun, 
+             top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             show_row_names = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+            # legend_height = unit(8,"cm"),
+            legend_direction = "horizontal",
+            legend_width = unit(8,"cm"),
+             #gap = unit(1,"cm"),
+             title_position = "topcenter" #  leftcenter-rot
+             ),
+             
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+
+#png('plots/Se_comp_trimmed.png', height=12, width=36, unit = "cm", res = 75)
+draw(h,heatmap_legend_side = "bottom")
+#dev.off()
+
+#pdf('plots/se_comp_genes_se16_mapped_no_spo_dups_small.pdf', height=3, width=6)
+#h
+#dev.off()
+```
+
+## Rescale color
+
+
+## Subset of more highly expressed genes
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
+
+
+col_fun2 = colorRamp2(c(min(ec_log_counts[rows_sel_high, cols_sel]),
+                       #median(data.matrix(ec_log_counts[rows_sel_high, cols_sel])),
+                       quantile(data.matrix(ec_log_counts[rows_sel_high, cols_sel]), probs = 0.9),
+                       max(ec_log_counts[rows_sel_high, cols_sel])),
+                     c("grey", "#E7D4E8", "#762A83"))
+
+
+
+h <- Heatmap(ec_log_counts[rows_sel_high, cols_sel], col = col_fun2, 
+             top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             show_row_names = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+            # legend_height = unit(8,"cm"),
+            legend_direction = "horizontal",
+            legend_width = unit(8,"cm"),
+             #gap = unit(1,"cm"),
+             title_position = "topcenter" #  leftcenter-rot
+             ),
+             
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+
+#png('plots/Se_comp_trimmed.png', height=12, width=36, unit = "cm", res = 75)
+draw(h,heatmap_legend_side = "bottom")
+#dev.off()
+
+#pdf('plots/se_comp_genes_se16_mapped_no_spo_dups_small.pdf', height=3, width=6)
+#h
+#dev.off()
+```
+
+
+## HK genes
 
 ```{r}
 
-ec_hk_gene_list <-  read_excel('Ecoli_GEO_strains_working_v1.xlsx', sheet = 3 )
-ec_gene_pa <- read.csv('ecoli_lim_outv3/gene_presence_absence.csv', stringsAsFactors = F)
-ec_gene_anns <- read.csv('ecoli_pan_genome/ecoli_pan_genome.tsv', sep = '\t', stringsAsFactors = F)
-
-gpa_anns <- read.csv('ecoli_pan_genomev3_gene_presence_absence_ann.csv', stringsAsFactors = F)
-
-sum(gpa_anns$first_name_comp %in% ec_counts$X)
+ec_hk_gene_list <-  read_excel('../compendia/Ecoli_GEO_strains_working_v1.xlsx', sheet = 3 )
+ec_gene_pa <- read.csv('ecoli_lim_outv3_gene_presence_absence.csv', stringsAsFactors = F)
+ec_gene_anns <- read.csv('ecoli_pan_genome.tsv', sep = '\t', stringsAsFactors = F)
 #ec_gene_loci <- read.table('ecoli_pan_genome/sepi_pan_genome_feature_table.tsv', stringsAsFactors = F,
 #                           header = F, skip = 1, sep = ">")
 #se_gene_loci$locus_id <- str_extract(se_gene_loci$V2, '[a-zA-Z0-9_]+')
 #se_gene_loci$name_id <- str_extract(se_gene_loci$V2, 'GOBBEKFC_[0-9]*')
 
 ```
-
-```{r}
-sum(ec_gene_pa$No..isolates == 1 & !(ec_gene_pa$panDB_b562 == ""))
-
-pandb_only <- str_detect(ec_counts$X, "panDB562")
-```
-
-```{r, warning=F, message=F,, fig.width=12, fig.height=6}
-
-
-sum(rowSums(ec_counts[pandb_only,-c(1,2,3)] == 0, na.rm=T) > 20000 )
-
-hist((rowSums(ec_counts[pandb_only,-c(1,2,3)] == 0, na.rm=T) ))
-```
-
-```{r}
-rownames(gpa_anns) <- gpa_anns$first_name_comp
-rownames(ec_counts) <- ec_counts$X
-
-gpa_anns$zero_count <- rowSums(ec_counts[rownames(gpa_anns),-c(1,2,3)] == 0, na.rm=T)
-write.csv(gpa_anns,
-          'ecoli_pan_genomev3_gene_presence_absence_ann2.csv')
-```
-
-
-
-```{r}
-
-ec_counts_temp <- data.matrix(ec_counts[rownames(gpa_anns),-c(1,2,3)])
-sum(is.na(ec_counts_temp))
-ec_counts_temp[ec_counts_temp==0] <- NA
-sum(is.na(ec_counts_temp))
-
-gpa_anns$median_exp <- rowMedians(ec_counts_temp, na.rm=T)
-```
-
-```{r}
-write.csv(gpa_anns,
-          'ecoli_pan_genomev3_gene_presence_absence_ann3.csv')
-```
-
-
-## HK genes
-
 
 ```{r, echo = F}
 ec_hk_gene_list$pangenome <-  ec_hk_gene_list$Gene %in% ec_gene_pa$Gene
@@ -314,8 +457,8 @@ flextable::width(ft_1, width = dim_pretty(ft_1)[[1]])
 
 ec_hk_genes <- ec_gene_pa[ec_gene_pa$Gene %in% ec_hk_gene_list$Gene,]
 
-ec_hk_genes_names <- ec_hk_genes$Gene[ec_hk_genes$No..isolates == 15]
-ec_hk_genes_loci <- ec_hk_genes$GCF_000005845.2[ec_hk_genes$No..isolates == 15]
+ec_hk_genes_names <- ec_hk_genes$Gene[ec_hk_genes$No..isolates == 19]
+ec_hk_genes_loci <- ec_hk_genes$GCF_000005845.2[ec_hk_genes$No..isolates == 19]
 
 ec_hk_loci <- ec_hk_genes_loci[ec_hk_genes_loci %in% ec_counts$X]
 
@@ -336,6 +479,49 @@ abline(v = hk_probs[2], col='red',lty=2)
 
 ```
 
+# Hk gene heatmap 
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
+
+hk_rows <- rownames(ec_counts)[ec_counts$X %in% ec_hk_loci]
+
+row_ha = rowAnnotation("set" = c(rep("random",length(rows_sel_high)),
+                                 rep("HK", length(hk_rows))),
+                       col = list(set = c("random" = "white", "HK" = "red")))
+
+
+h <- Heatmap(ec_log_counts[c(rows_sel_high, hk_rows), cols_sel], col = col_fun, 
+             top_annotation = ha,
+             left_annotation = row_ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             show_row_names = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+            # legend_height = unit(8,"cm"),
+            legend_direction = "horizontal",
+            legend_width = unit(8,"cm"),
+             #gap = unit(1,"cm"),
+             title_position = "topcenter" #  leftcenter-rot
+             ),
+             
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+
+#png('plots/Se_comp_trimmed.png', height=12, width=36, unit = "cm", res = 75)
+draw(h,heatmap_legend_side = "bottom")
+#dev.off()
+
+#pdf('plots/se_comp_genes_se16_mapped_no_spo_dups_small.pdf', height=3, width=6)
+#h
+#dev.off()
+```
+
+
 ## Ec zero-count genes dist
 
 ```{r, warning=F, message=F,, fig.width=4, fig.height=4}
@@ -355,7 +541,7 @@ abline(v = zc_probs[2], col='red',lty=2)
 ```{r}
 hk_medians <- apply(ec_hk_counts[,-c(1,2,3)],2,FUN = 
                             function(x) log(max(median(x),1)))
-zero_counts <- apply(ec_counts[,-c(1,2)],2,FUN = 
+zero_counts <- apply(ec_counts[,-c(1,2,3)],2,FUN = 
                        function(x) log(max(sum(x==0),1)))
 
 hk_lims <- hk_probs
@@ -394,7 +580,7 @@ filt_run_table$zc_test <- sapply(filt_run_table$zero_counts, function(x){
   } else{ "pass"}
 })
 
-write.csv(filt_run_table, "SraRunTable_Ec_04_29_25_FILTERED.csv")
+write.csv(filt_run_table, "SraRunTable_Ec_04_29_25_FILTEREDv3_MG1655plus.csv")
 
 ##
 ec_run_table_out <- ec_run_table
@@ -427,9 +613,12 @@ ec_run_table_out$zc_test <- sapply(ec_run_table_out$zero_counts, function(x){
 ec_run_table_out$passed_filtering <- !(ec_run_table_out$Experiment %in% filtered_runs)
 ec_run_table_out$passed_filtering[ec_run_table_out$zc_test == "not processed yet"] <- "not processed yet"
 
-write.csv(ec_run_table_out, "SraRunTable_Ec_04_29_25_working_v2.csv")
+write.csv(ec_run_table_out, "SraRunTable_Ec_04_29_25_working_v3_part2_MG1655plus.csv")
 ```
 
+```{r}
+sum(rowSums(ec_counts[,c(F,F,F,!ec_counts_filtered)]) > 0)
+```
 
 
 samples filtered out : `r sum(!ec_counts_filtered)`
@@ -438,30 +627,21 @@ samples remaining : `r sum(ec_counts_filtered)`
 
 ## Heatmap of Ec data showing filter
 
-```{r, warning=F, message=F,, fig.width=12, fig.height=6}
-ec_log_counts <- log(ec_counts_t + 1)
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
 
-col_fun = colorRamp2(c(min(ec_log_counts), median(data.matrix(ec_log_counts)), max(ec_log_counts)), c("grey", "#E7D4E8", "#762A83"))
 
-col_fun = colorRamp2(c(min(ec_log_counts), median(data.matrix(ec_log_counts)), max(ec_log_counts)), c("grey", "#E7D4E8", "#762A83"))
-ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(ec_studies))]
-ann_colors <- colorRampPalette(brewer.pal(6, "Greys"))(length(unique(ec_studies)))
-ann_colors <- rep(brewer.pal(6,'Greys'),50)[1:length(unique(ec_studies))]
-names(ann_colors) <- unique(ec_studies)
-st_colors <- rep(brewer.pal(8,'Dark2'),5)[1:length(unique(ec_strains))]
-names(st_colors) <- unique(ec_strains)
-
-ha <- HeatmapAnnotation(study = ec_studies[c(1:1000)], 
-                        strain = ec_strains[c(1:1000)],
-                        filter = ec_counts_filtered[c(1:1000)],
+ha <- HeatmapAnnotation(study = ec_studies[cols_sel], 
+                        strain = ec_strains[cols_sel],
+                        filter = ec_counts_filtered[cols_sel],
                         show_legend = c(F,T,T), 
                         annotation_name_side = "left",
                         col = list( study = ann_colors,
                                     strain = st_colors,
                                     filter = c('TRUE'="white",'FALSE'="black")))
 
-h <- Heatmap(ec_log_counts[c(1:1000)], col = col_fun, 
+h <- Heatmap(ec_log_counts[c(rows_sel_high, hk_rows), cols_sel], col = col_fun, 
              top_annotation = ha,
+             left_annotation = row_ha,
              height = unit(8,"cm"),
              width = unit(24,"cm"),
              cluster_columns = F,
@@ -487,21 +667,11 @@ draw(h,heatmap_legend_side = "bottom")
 
 ## Heatmap of Ec data filtered
 
-```{r, warning=F, message=F,, fig.width=12, fig.height=6}
-ec_log_counts <- log(ec_counts_t[, ec_counts_filtered] + 1)
-
-col_fun = colorRamp2(c(min(ec_log_counts), median(data.matrix(ec_log_counts)), max(ec_log_counts)), c("grey", "#E7D4E8", "#762A83"))
-
-col_fun = colorRamp2(c(min(ec_log_counts), median(data.matrix(ec_log_counts)), max(ec_log_counts)), c("grey", "#E7D4E8", "#762A83"))
-ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(ec_studies))]
-ann_colors <- colorRampPalette(brewer.pal(6, "Greys"))(length(unique(ec_studies)))
-ann_colors <- rep(brewer.pal(6,'Greys'),50)[1:length(unique(ec_studies))]
-names(ann_colors) <- unique(ec_studies)
-st_colors <- rep(brewer.pal(8,'Dark2'),5)[1:length(unique(ec_strains))]
-names(st_colors) <- unique(ec_strains)
-
-ha <- HeatmapAnnotation(study = ec_studies[ec_counts_filtered][c(1:1000)], 
-                        strain = ec_strains[ec_counts_filtered][c(1:1000)],
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
+filt_sel <- c(1:ncol(ec_log_counts))[ec_counts_filtered]
+cols_sel <- c(1:ncol(ec_log_counts))[cols_sel]
+ha <- HeatmapAnnotation(study = ec_studies[intersect(filt_sel, cols_sel)] , 
+                        strain = ec_strains[intersect(filt_sel, cols_sel)],
                         #filter = ec_counts_filtered,
                         show_legend = c(F,T,T), 
                         annotation_name_side = "left",
@@ -509,8 +679,10 @@ ha <- HeatmapAnnotation(study = ec_studies[ec_counts_filtered][c(1:1000)],
                                     strain = st_colors,
                                     filter = c('TRUE'="white",'FALSE'="black")))
 
-h <- Heatmap(ec_log_counts[,c(1:1000)], col = col_fun, 
+h <- Heatmap(ec_log_counts[c(rows_sel_high, hk_rows),intersect(filt_sel, cols_sel)], 
+             col = col_fun, 
              top_annotation = ha,
+             left_annotation = row_ha,
              height = unit(8,"cm"),
              width = unit(24,"cm"),
              cluster_columns = F,
@@ -567,43 +739,33 @@ MRnorm <- function(data){
 
 ## Ec data normalize
 
-```{r, fig.width=4, fig.height=4}
-ec_counts_norm  <- MRnorm(ec_counts[,c(F,F,F,ec_counts_filtered)])
-rownames(ec_counts_norm) <- ec_counts$X
-hist(log(rowSums(ec_counts_norm)))
+```{r}
+temp <- ec_counts[,c(F,F,ec_counts_filtered)]
+tempm <- data.matrix(ceiling(temp))
+
+hist(log(rowSums(tempm)))
+
 ```
 
-```{r}
-sum(rowSums(ec_counts[,-c(1,2,3)] == 0, na.rm=T) < 19000 )
 
-ec_counts_norm_trimmed  <- MRnorm(ec_counts[rowSums(ec_counts[,-c(1,2,3)] == 0, na.rm=T) < 19000 ,c(F,F,F,ec_counts_filtered)])
-rownames(ec_counts_norm_trimmed) <- ec_counts$X[rowSums(ec_counts[,-c(1,2,3)] == 0, na.rm=T) < 19000 ]
-hist(log(rowSums(ec_counts_norm_trimmed)))
+```{r, fig.width=4, fig.height=4}
+ec_counts_norm  <- MRnorm(ec_counts[rowSums(tempm) > 0,c(F,F,ec_counts_filtered)] + 1)
+rownames(ec_counts_norm) <- ec_counts$X[rowSums(tempm) > 0]
+hist(log(rowSums(ec_counts_norm)))
 
+ec_counts_norm_log <- log10(ec_counts_norm + 1)
+
+cols_sel_rx <- colnames(ec_counts)[intersect(filt_sel, cols_sel)]
+cols_sel_rx <- cols_sel_rx[cols_sel_rx %in% colnames(ec_counts_norm_log)]
 ```
 
 ## Heatmap of normalized, filtered and trimmed Ec data
 
-```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+```{r, warning=F, message=F,, fig.width=12, fig.height=6, eval=T}
 
 
-
-ec_counts_norm_t <- ec_counts_norm[rowSums(ec_counts_norm) > exp(15),]
-
-ec_log_counts_norm_t <- data.frame(log(ec_counts_norm_t  + 1))
-
-
-col_fun = colorRamp2(c(min(ec_log_counts_norm_t), median(data.matrix(ec_log_counts_norm_t)), max(ec_log_counts_norm_t)), c("grey", "#E7D4E8", "#762A83"))
-
-ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(ec_studies))]
-ann_colors <- colorRampPalette(brewer.pal(6, "Greys"))(length(unique(ec_studies)))
-ann_colors <- rep(brewer.pal(6,'Greys'),50)[1:length(unique(ec_studies))]
-names(ann_colors) <- unique(ec_studies)
-st_colors <- rep(brewer.pal(8,'Dark2'),5)[1:length(unique(ec_strains))]
-names(st_colors) <- unique(ec_strains)
-
-ha <- HeatmapAnnotation(study = ec_studies[ec_counts_filtered][c(1:1000)], 
-                        strain = ec_strains[ec_counts_filtered][c(1:1000)],
+ha <- HeatmapAnnotation(study = ec_studies[cols_sel_rx], 
+                        strain = ec_strains[cols_sel_rx],
                         #filter = ec_counts_filtered,
                         show_legend = c(F,T,T), 
                         annotation_name_side = "left",
@@ -611,8 +773,10 @@ ha <- HeatmapAnnotation(study = ec_studies[ec_counts_filtered][c(1:1000)],
                                     strain = st_colors,
                                     filter = c('TRUE'="white",'FALSE'="black")))
 
-h <- Heatmap(ec_log_counts_norm_t[,c(1:1000)], col = col_fun, 
+h <- Heatmap(ec_counts_norm_log[as.numeric(c(rows_sel, hk_rows)),cols_sel_rx], 
+             col = col_fun, 
              top_annotation = ha,
+             #left_annotation = row_ha,
              height = unit(8,"cm"),
              width = unit(24,"cm"),
              cluster_columns = F,
@@ -631,9 +795,25 @@ h <- Heatmap(ec_log_counts_norm_t[,c(1:1000)], col = col_fun,
 #h
 
 #png('plots/Se_comp_filtered_normalized_trimmed.png', height=12, width=36, unit = "cm", res = 75)
-#draw(h,heatmap_legend_side = "bottom")
+draw(h,heatmap_legend_side = "bottom")
 #dev.off()
 ```
+
+
+
+
+```{r, fig.width=4, fig.height=4}
+ec_counts_norm_t  <- MRnorm(ec_counts_t[,c(ec_counts_filtered)] + 1)
+rownames(ec_counts_norm_t) <- ec_counts_t$X
+hist(log(rowSums(ec_counts_norm_t)))
+
+ec_counts_norm_t_log <- log10(ec_counts_norm_t + 1)
+
+
+```
+
+
+
 
 ## Write out Ec compendia
 
@@ -643,14 +823,16 @@ h <- Heatmap(ec_log_counts_norm_t[,c(1:1000)], col = col_fun,
 
 -   (without rownames)
 
+
+
 ```{r}
 #rownames(se_counts_norm) <- se_counts$X
 ec_log_counts_norm <- data.frame(log(ec_counts_norm  + 1))
-ec_log_counts_norm_t <- data.frame(log(ec_counts_norm_t  + 1))
-#write.csv(ec_counts_norm, 'compendia/ecoli_pan_genome_clean_norm.csv', row.names = F)
-#write.csv(ec_log_counts_norm, 'compendia/ecoli_pan_genome_clean_norm_log.csv', row.names = F)
-#write.csv(ec_counts_norm_t, 'compendia/ecoli_pan_genome_trimmed_clean_norm.csv', row.names = F)
-#write.csv(ec_log_counts_norm_t, 'compendia/ecoli_pan_genome_trimmed_clean_norm_log.csv', row.names = F)
+#ec_log_counts_norm_t <- data.frame(log(ec_counts_norm_t  + 1))
+write.csv(ec_counts_norm, 'compendia/ecoli_MG1655plus_genome_clean_norm_part2.csv', row.names = F)
+write.csv(ec_log_counts_norm, 'compendia/ecoli_MG165plus_genome_clean_norm_log_part2.csv', row.names = F)
+           #write.csv(ec_counts_norm_t, 'compendia/ecoli_MG165_genome_trimmed_clean_norm_part2.csv', row.names = F)
+#write.csv(ec_log_counts_norm_t, 'compendia/ecoli_MG165_genome_trimmed_clean_norm_log_part2.csv', row.names = F)
 
 ```
 
@@ -664,18 +846,18 @@ ec_log_counts_norm_t <- data.frame(log(ec_counts_norm_t  + 1))
 
 ```{r}
 range <- max(ec_log_counts_norm) - min(ec_log_counts_norm)
-range_t <- max(ec_log_counts_norm_t) - min(ec_log_counts_norm_t)
-min(ec_log_counts_norm[ec_log_counts_norm > 0])
+#range_t <- max(ec_log_counts_norm_t) - min(ec_log_counts_norm_t)
+#min(ec_log_counts_norm[ec_log_counts_norm > 0])
 
 ec_log_counts_norm_01 <- ec_log_counts_norm / range
-ec_log_counts_norm_t_01 <- ec_log_counts_norm_t / range_t
+#ec_log_counts_norm_t_01 <- ec_log_counts_norm_t / range_t
 
 max(ec_log_counts_norm_01)
 min(ec_log_counts_norm_01)
 
-write.csv(ec_log_counts_norm_01, 'compendia/ecoli_pan_genome_log_counts_norm_01_nonames.csv', row.names = F)
-write.csv(ec_log_counts_norm_01, 'compendia/ecoli_pan_genome_log_counts_norm_01.csv', row.names = T)
+write.csv(ec_log_counts_norm_01, 'compendia/ecoli_MG165plus_genome_part2_log_counts_norm_01_nonames.csv', row.names = F)
+write.csv(ec_log_counts_norm_01, 'compendia/ecoli_MG165plus_genome_part2_log_counts_norm_01.csv', row.names = T)
 
-#write.csv(ec_log_counts_norm_t_01, 'compendia/ecoli_pan_genome_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
-#write.csv(ec_log_counts_norm_t_01, 'compendia/ecoli_pan_genome_trimmed_log_counts_norm_01.csv', row.names = T)
+#write.csv(ec_log_counts_norm_t_01, 'compendia/ecoli_MG165_genome_part2_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(ec_log_counts_norm_t_01, 'compendia/ecoli_MG165_genome_part2_trimmed_log_counts_norm_01.csv', row.names = T)
 ```

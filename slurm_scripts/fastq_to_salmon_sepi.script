@@ -1,0 +1,63 @@
+#!/bin/bash -l
+
+
+################################################################################
+#Script Name: sra_to_salmon_se.script
+#Description: Submission script for sra_to_salmon job arrays
+#Args       : None 
+#Author     : Georgia Doing
+#Email      : georgia.doing@duke.edu
+################################################################################
+
+##SBATCH --partition=standard
+###SBATCH --partition=bigmem
+#SBATCH --job-name=bdl
+#SBATCH --time=03:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=6
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user=georgia.doing@duke.edu
+#SBATCH --array=1-108%4
+#SBATCH -o /work/gd134/oe/%u-%x-%A-%a
+##SBATCH --mem=128G
+###SBATCH --hostlist=[k01-58]
+
+
+# To process in house fastq files into the compendium format
+#
+#
+
+
+conda activate micro-seq-comp
+
+cd $SLURM_SUBMIT_DIR
+
+#less $SLURM_JOB_NODELIST
+mkdir -p /work/gd134
+#mkdir /work/gd134/$SLURM_JOB_ID
+
+FQSAMPS=( $( ls /work/gd134/staph-rnaseq ) )
+
+echo FQSAMPS:
+echo ${FQSAMPS[${SLURM_ARRAY_TASK_ID}]}
+
+SAMP=${FQSAMPS[${SLURM_ARRAY_TASK_ID}]}
+
+echo $SAMP
+
+FQFILES=( $( find /work/gd134/staph-rnaseq/$SAMP | grep '_R1_' ) )
+
+echo ${FQFILES[*]}
+
+salmon quant -i  ../t_indxs/sepi_pan_genome_k15 \
+    --softclip \
+    --softclipOverhangs \
+    --minScoreFraction 0.65 \
+    --fldMean 51 \
+    --seqBias \
+    --libType U \
+    -r ${FQFILES[*]}  \
+    -o /work/gd134/staph_rnaseq_out_sepi/staph_rnaseq-$SAMP/
+
+
+

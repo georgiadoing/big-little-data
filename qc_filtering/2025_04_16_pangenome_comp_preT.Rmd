@@ -1,0 +1,1742 @@
+---
+title: "Pangenome compendia"
+output: powerpoint_presentation
+date: "2025-04-16"
+---
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  dev = "#png",
+  dpi = 300,
+  fig.width = 5,
+  fig.height = 4
+)
+```
+
+```{r, warning=F, message=F, include=F}
+library(librarian)
+shelf(KEGGREST, 
+      EnrichmentBrowser,
+      ComplexHeatmap,
+      circlize,
+      RColorBrewer,
+      DESeq2,
+      dplyr,
+      corrplot,
+      ggplot2,
+      stringr,
+      reshape2,
+      ggprism,
+      magick,
+      readr)
+#library(KEGGREST)
+#library(EnrichmentBrowser)
+#library(ComplexHeatmap)
+#library(circlize)
+#library(RColorBrewer)
+#library(DESeq2)
+#library(dplyr)
+#library(corrplot)
+#library(ggplot2)
+```
+
+
+
+## Load data
+
+```{r}
+se_counts <- read.csv('num_reads_sepi_pan_genome_sepi_comp_k15.csv', stringsAsFactors = F)
+sa_counts <- read.csv('num_reads_saur_pan_genome_saur_comp_k15.csv', stringsAsFactors = F)
+sa_cross_counts <- read.csv('num_reads_sepi_pan_genome_saur_comp_k15.csv', stringsAsFactors = F)
+
+```
+
+## Load Run Tables
+
+```{r}
+se_run_table <- read.csv('SraRunTable_Se_rna_2024_02_07_st_extra.csv', stringsAsFactors = F)
+sa_run_table <- read.csv('SraRunTable_Sa_rna_2024_02_07_st_extra.csv', stringsAsFactors = F)
+
+```
+
+
+
+## Data frames
+
+
+```{r}
+se_studies <- sapply(colnames(se_counts)[-c(1,2)], function(x) 
+  se_run_table$SRA.Study[se_run_table$Experiment == x][1])
+se_strains <- sapply(colnames(se_counts)[-c(1,2)], function(x) 
+  se_run_table$str_detect_group[se_run_table$Experiment == x][1])
+
+###
+
+sa_studies <- sapply(colnames(sa_counts)[-c(1,2)], function(x) 
+  sa_run_table$SRA.Study[sa_run_table$Experiment == x][1])
+sa_strains <- sapply(colnames(sa_counts)[-c(1,2)], function(x) 
+  sa_run_table$str_detect_group[sa_run_table$Experiment == x][1])
+
+## sa_cross_counts
+sa_cross_studies <- sapply(colnames(sa_cross_counts)[-c(1,2)], function(x) 
+  sa_run_table$SRA.Study[sa_run_table$Experiment == x][1])
+sa_cross_strains <- sapply(colnames(sa_cross_counts)[-c(1,2)], function(x) 
+  sa_run_table$str_detect_group[sa_run_table$Experiment == x][1])
+
+
+```
+
+
+
+## Se initital heatmap - trimmed for plotting
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+se_counts_t <- se_counts[,-c(1,2)]
+se_counts_t <- se_counts_t[rowSums(se_counts_t) > 50000,]
+
+se_log_counts <- log(se_counts_t + 1)
+
+
+col_fun = colorRamp2(c(min(se_log_counts), median(data.matrix(se_log_counts)), max(se_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_studies))]
+
+ann_colors <- colorRampPalette(brewer.pal(6, "Greys"))(length(unique(se_studies)))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),15)[1:length(unique(se_studies))]
+
+names(ann_colors) <- unique(se_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_strains))]
+names(st_colors) <- unique(se_strains)
+
+ha <- HeatmapAnnotation(study = se_studies, 
+                        strain = se_strains,
+                        show_legend = c(F,T), 
+                        col = list( study = ann_colors, 
+                                                     strain = st_colors))
+
+h <- Heatmap(se_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             show_row_names = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+h
+
+#png('plots/Se_comp_trimmed.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+
+#pdf('plots/se_comp_genes_se16_mapped_no_spo_dups_small.pdf', height=3, width=6)
+#h
+#dev.off()
+```
+
+
+## Sa initital heatmap - trimmed for plotting
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_counts_t <- sa_counts[,-c(1,2)]
+rownames(sa_counts_t) <- sa_counts$X
+sa_counts_t <- sa_counts_t[rowSums(sa_counts_t) > 500000,]
+
+sa_log_counts <- log(sa_counts_t + 1)
+
+
+col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_studies))]
+
+ann_colors <- colorRampPalette(brewer.pal(6, "Greys"))(length(unique(sa_studies)))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),100)[1:length(unique(sa_studies))]
+
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+ha <- HeatmapAnnotation(study = sa_studies, 
+                        strain = sa_strains,
+                        show_legend = c(F,T), 
+                        col = list( study = ann_colors, 
+                                                     strain = st_colors))
+
+h <- Heatmap(sa_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             show_row_names = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+h
+
+#png('plots/Sa_comp_trimmed.#png', height=6, width=24, unit = "in", res = 150)
+#h
+#dev.off()
+#h
+#pdf('plots/se_comp_genes_se16_mapped_no_spo_dups_small.pdf', height=3, width=6)
+#h
+#dev.off()
+```
+
+
+## Sa - cross mapped initital heatmap - trimmed for plotting
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_cross_counts_t <- sa_cross_counts[,-c(1,2)]
+sa_cross_counts_t <- sa_cross_counts_t[rowSums(sa_cross_counts_t) > 1000,]
+
+sa_cross_log_counts <- log(sa_cross_counts_t + 1)
+
+
+col_fun = colorRamp2(c(min(sa_cross_log_counts), median(data.matrix(sa_cross_log_counts)), max(sa_cross_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_cross_studies))]
+
+ann_colors <- colorRampPalette(brewer.pal(6, "Greys"))(length(unique(sa_cross_studies)))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),100)[1:length(unique(sa_cross_studies))]
+
+names(ann_colors) <- unique(sa_cross_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_cross_strains))]
+names(st_colors) <- unique(sa_cross_strains)
+
+ha <- HeatmapAnnotation(study = sa_cross_studies, 
+                        strain = sa_cross_strains,
+                        show_legend = c(F,T), 
+                        col = list( study = ann_colors, 
+                                                     strain = st_colors))
+
+h <- Heatmap(sa_cross_log_counts, col = col_fun, 
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             show_row_names = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+
+##png('plots/Sa_cross_mapped_comp_trimmed.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+
+
+h <- Heatmap(sa_cross_log_counts, col = col_fun, 
+             height = unit(8,"cm"),
+             width = unit(48,"cm"),
+             cluster_columns = F,
+             cluster_rows=F,
+             show_row_names = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(2,"in"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=0),
+             )
+#h
+
+#png('plots/Sa_cross_mapped_comp_trimmed_noclust.#png', height=6, width=24, unit = "in", res = 150)
+#h
+#dev.off()
+#h
+#pdf('plots/se_comp_genes_se16_mapped_no_spo_dups_small.pdf', height=3, width=6)
+#h
+#dev.off()
+```
+
+
+## HK genes
+
+From  paper, hk genes:
+* gmk (SE_0885) - got from feature table above
+* DHFR genes dfrc (SE_1119) and thyF (SE_1120) (megablast emb|Z48233.1|)
+* tpi (SE_0560) (megablstgb|KY398645.1|)
+* 16S rRNA (SEr06) - had to blast ATCC 14990 against S.e. ATCC 122238 (megablast dbj|D83363.1|)
+* hsp-60  groL (SE_1629)(megablast gb|AF029245.1|)
+
+
+
+```{r}
+se_gene_pa <- read.csv('sepi_out_1707234787/gene_presence_absence.csv', stringsAsFactors = F)
+se_gene_anns <- read.csv('sepi_pan_genome/sepi_pan_genome.tsv', sep = '\t', stringsAsFactors = F)
+se_gene_loci <- read.table('sepi_pan_genome/sepi_pan_genome_feature_table.tsv', stringsAsFactors = F,
+                           header = F, skip = 1, sep = ">")
+se_gene_loci$locus_id <- str_extract(se_gene_loci$V2, '[a-zA-Z0-9_]+')
+se_gene_loci$name_id <- str_extract(se_gene_loci$V2, 'GOBBEKFC_[0-9]*')
+
+length(unique(se_gene_loci$locus_id))
+length(unique(se_gene_loci$name_id))
+###
+
+
+sa_gene_pa <- read.csv('saur_out_1707260617/gene_presence_absence.csv', stringsAsFactors = F)
+sa_gene_anns <- read.csv('saur_pan_genome/saur_pan_genome.tsv', sep = '\t', stringsAsFactors = F)
+sa_gene_loci <- read.table('saur_pan_genome/saur_pan_genome_feature_table.tsv', stringsAsFactors = F,
+                           header = F, skip = 1, sep = ">")
+sa_gene_loci$locus_id <- str_extract(sa_gene_loci$V2, '[a-zA-Z0-9_]+')
+sa_gene_loci$name_id <- str_extract(sa_gene_loci$V2, 'AADLDMHG_[0-9]*')
+length(unique(sa_gene_loci$locus_id))
+length(unique(sa_gene_loci$name_id))
+```
+
+
+## Se HK gene dist
+
+
+```{r, warning=F, message=F,, fig.width=4, fig.height=4}
+se_hk_genes <- se_gene_pa[sapply(se_gene_pa$Gene, 
+                                             function(x){
+                                               y <- str_detect(x, 
+                                                               c("gmk","thyF","tpi","gyrB",
+                                                                 "groL","hsp","dfr","16S",
+                                                                 "tpi","groE","rsm", "rpoD",
+                                                                 "dna"))
+                                               TRUE %in% y
+                                               }),]
+
+se_hk_genes_names <- se_hk_genes$Gene[se_hk_genes$No..isolates == 6]
+se_hk_genes_loci <- se_hk_genes$GCF_000007645.1[se_hk_genes$No..isolates == 6]
+
+se_hk_loci <- se_hk_genes_loci[se_hk_genes_loci %in% se_counts$X]
+
+
+se_hk_counts  <- se_counts[se_counts$X %in% se_hk_loci,]
+
+hk_probs <- quantile(apply(se_hk_counts[,-c(1,2)],2,FUN = 
+                            function(x) log(max(median(x),1))), 
+                    probs = c(.05,.995))
+
+#pdf('plots/se16_comp_hk_counts.pdf', height=4, width=4)
+plot(hist(apply(se_hk_counts[,-c(1,2)],2,FUN = function(x) log(max(median(x),1))), 
+          breaks = 75, plot=F),
+     main = 'HK genes', xlab = 'log counts (floor 1)')
+abline(v = hk_probs[1], col='red',lty=2)
+abline(v = hk_probs[2], col='red',lty=2)
+#dev.off()
+
+```
+
+
+## Se zero-count genes dist
+
+```{r, warning=F, message=F,, fig.width=4, fig.height=4}
+zc_probs <- quantile(apply(se_counts[,-c(1,2)],2,FUN = function(x) log(max(sum(x==0),1))), 
+                    probs = c(.05,.95))
+#pdf('plots/se16_comp_zero_counts.pdf', height=4, width=4)
+plot(hist(apply(se_counts[,-c(1,2)],2,FUN = function(x) log(max(sum(x==0),1))),
+          breaks = 50, plot=F),
+     main = 'zero count genes', xlab = 'log zero counts(floor 1)')
+abline(v = zc_probs[1], col='red',lty=2)
+abline(v = zc_probs[2], col='red',lty=2)
+#dev.off()
+```
+
+
+
+
+## Filter Se data
+
+
+```{r}
+hk_medians <- apply(se_hk_counts[,-c(1,2)],2,FUN = 
+                            function(x) log(max(median(x),1)))
+zero_counts <- apply(se_counts[,-c(1,2)],2,FUN = 
+                       function(x) log(max(sum(x==0),1)))
+
+hk_lims <- hk_probs
+zc_lims <- zc_probs
+se_counts_filtered <- sapply(c(1:length(hk_medians)), 
+                             function(x){
+                               if(hk_medians[x] > hk_lims[1] & 
+                                  hk_medians[x] < hk_lims[2] &
+                                  zero_counts[x] > zc_lims[1] &
+                                  zero_counts[x] < zc_lims[2]){T}else{F}
+                             })
+
+```
+
+
+## Heatmap of Se data showing filter
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+se_log_counts <- log(se_counts_t + 1)
+
+col_fun = colorRamp2(c(min(se_log_counts), median(data.matrix(se_log_counts)), max(se_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(6,'Greys'),30)[1:length(unique(se_studies))]
+
+names(ann_colors) <- unique(se_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_strains))]
+names(st_colors) <- unique(se_strains)
+
+ha <- HeatmapAnnotation(study = se_studies, 
+                        strain = se_strains,
+                        filter = se_counts_filtered,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors,
+                                    filter = c('TRUE'="white",'FALSE'="black")))
+
+
+h <- Heatmap(se_log_counts, col = col_fun, 
+             top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#h
+```
+
+
+## Heatmap of Se data filtered
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+se_log_counts <- log(se_counts_t + 1)
+
+col_fun = colorRamp2(c(min(se_log_counts), median(data.matrix(se_log_counts)), max(se_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- colorRampPalette(brewer.pal(8, "Dark2"))(length(unique(se_studies)))
+ann_colors <- colorRampPalette(brewer.pal(8, "Dark2"))(length(unique(se_studies)))
+names(ann_colors) <- unique(se_studies)
+ha <- HeatmapAnnotation(study = se_studies[se_counts_filtered], show_legend = F, col = list( study = ann_colors))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),30)[1:length(unique(se_studies))]
+
+names(ann_colors) <- unique(se_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_strains))]
+names(st_colors) <- unique(se_strains)
+
+ha <- HeatmapAnnotation(study = se_studies[se_counts_filtered], 
+                        strain = se_strains[se_counts_filtered],
+                        #filter = se_counts_filtered,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors#,
+                                    #filter = c('TRUE'="white",'FALSE'="black")
+                                    ))
+
+h <- Heatmap(se_log_counts[,se_counts_filtered], col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#h
+```
+
+
+## Sa HK gene dists
+
+```{r, warning=F, message=F,, fig.width=4, fig.height=4}
+sa_hk_genes <- sa_gene_pa[sapply(sa_gene_pa$Gene, 
+                                             function(x){
+                                               y <- str_detect(x, 
+                                                               c("gmk","thyF","tpi","gyrB",
+                                                                 "groL","hsp","dfr","16S",
+                                                                 "tpi","groE","rsm", "rpoD",
+                                                                 "dna"))
+                                               TRUE %in% y
+                                               }),]
+
+sa_hk_genes_names <- sa_hk_genes$Gene[sa_hk_genes$No..isolates == 18]
+sa_hk_genes_loci <- sa_hk_genes$GCF_000009645.1[sa_hk_genes$No..isolates == 18]
+
+sa_hk_loci <- sa_hk_genes_loci[sa_hk_genes_loci %in% sa_counts$X]
+
+
+sa_hk_counts  <- sa_counts[sa_counts$X %in% sa_hk_loci,]
+
+hk_probs <- quantile(apply(sa_hk_counts[,-c(1,2)],2,FUN = 
+                            function(x) log(max(median(x),1))), 
+                    probs = c(.15,.99))
+
+#pdf('plots/se16_comp_hk_counts.pdf', height=4, width=4)
+plot(hist(apply(sa_hk_counts[,-c(1,2)],2,FUN = function(x) log(max(median(x),1))), 
+          breaks = 75, plot=F),
+     main = 'HK genes', xlab = 'log counts (floor 1)')
+abline(v = hk_probs[1], col='red',lty=2)
+abline(v = hk_probs[2], col='red',lty=2)
+#dev.off()
+
+```
+
+
+
+## Sa zero-count genes dist 
+
+
+```{r, warning=F, message=F,, fig.width=4, fig.height=4}
+zc_probs <- quantile(apply(sa_counts[,-c(1,2)],2,FUN = function(x) log(max(sum(x==0),1))), 
+                    probs = c(.05,.9))
+#pdf('plots/se16_comp_zero_counts.pdf', height=4, width=4)
+plot(hist(apply(sa_counts[,-c(1,2)],2,FUN = function(x) log(max(sum(x==0),1))),
+          breaks = 50, plot=F),
+     main = 'zero count genes', xlab = 'log zero counts(floor 1)')
+abline(v = zc_probs[1], col='red',lty=2)
+abline(v = zc_probs[2], col='red',lty=2)
+#dev.off()
+```
+
+
+## Filer Sa data
+
+```{r}
+hk_medians <- apply(sa_hk_counts[,-c(1,2)],2,FUN = 
+                            function(x) log(max(median(x),1)))
+zero_counts <- apply(sa_counts[,-c(1,2)],2,FUN = 
+                       function(x) log(max(sum(x==0),1)))
+
+hk_lims <- hk_probs
+zc_lims <- zc_probs
+sa_counts_filtered <- sapply(c(1:length(hk_medians)), 
+                             function(x){
+                               if(hk_medians[x] > hk_lims[1] & 
+                                  hk_medians[x] < hk_lims[2] &
+                                  zero_counts[x] > zc_lims[1] &
+                                  zero_counts[x] < zc_lims[2]){T}else{F}
+                             })
+
+
+```
+
+
+## Heatmap of Sa showing filter
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_log_counts <- log(sa_counts_t + 1)
+
+col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),100)[1:length(unique(sa_studies))]
+
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+ha <- HeatmapAnnotation(study = sa_studies, 
+                        strain = sa_strains,
+                        filter = sa_counts_filtered,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors,
+                                    filter = c('TRUE'="white",'FALSE'="black")))
+
+h <- Heatmap(sa_log_counts, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#h
+```
+
+
+## Heatmap of Sa filtered
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_log_counts <- log(sa_counts_t + 1)
+
+col_fun = colorRamp2(c(min(sa_log_counts), median(data.matrix(sa_log_counts)), max(sa_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- colorRampPalette(brewer.pal(8, "Dark2"))(length(unique(sa_studies)))
+names(ann_colors) <- unique(sa_studies)
+ha <- HeatmapAnnotation(study = sa_studies[sa_counts_filtered], show_legend = F, col = list( study = ann_colors))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),30)[1:length(unique(sa_studies))]
+
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+ha <- HeatmapAnnotation(study = sa_studies[sa_counts_filtered], 
+                        strain = sa_strains[sa_counts_filtered],
+                        #filter = se_counts_filtered,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors#,
+                                    #filter = c('TRUE'="white",'FALSE'="black")
+                                    ))
+
+h <- Heatmap(sa_log_counts[,sa_counts_filtered], col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#h
+```
+
+
+## Sa cross-mapped Se HK genes dist
+
+
+```{r, warning=F, message=F,, fig.width=4, fig.height=4}
+
+
+sa_cross_hk_loci <- se_hk_genes_loci[se_hk_genes_loci %in% sa_cross_counts$X]
+
+
+sa_cross_hk_counts  <- sa_cross_counts[sa_cross_counts$X %in% sa_cross_hk_loci,]
+
+hk_probs <- quantile(apply(sa_cross_hk_counts[,-c(1,2)],2,FUN = 
+                            function(x) log(max(median(x),1))), 
+                    probs = c(.15,.995))
+
+#pdf('plots/se16_comp_hk_counts.pdf', height=4, width=4)
+plot(hist(apply(sa_cross_hk_counts[,-c(1,2)],2,FUN = function(x) log(max(median(x),1))), 
+          breaks = 75, plot=F),
+     main = 'HK genes', xlab = 'log counts (floor 1)')
+abline(v = hk_probs[1], col='red',lty=2)
+abline(v = hk_probs[2], col='red',lty=2)
+#dev.off()
+
+```
+
+
+## Sa cross-mapped zero-count dists
+
+
+```{r, warning=F, message=F,, fig.width=4, fig.height=4}
+
+
+zc_probs <- quantile(apply(sa_cross_counts[,-c(1,2)],2,FUN = function(x) log(max(sum(x==0),1))), 
+                    probs = c(.005,.995))
+#pdf('plots/se16_comp_zero_counts.pdf', height=4, width=4)
+plot(hist(apply(sa_cross_counts[,-c(1,2)],2,FUN = function(x) log(max(sum(x==0),1))),
+          breaks = 50, plot=F),
+     main = 'zero count genes', xlab = 'log zero counts(floor 1)')
+abline(v = zc_probs[1], col='red',lty=2)
+abline(v = zc_probs[2], col='red',lty=2)
+#dev.off()
+```
+
+
+## Filter Sa cross-mapped data
+
+
+```{r}
+hk_medians <- apply(sa_cross_hk_counts[,-c(1,2)],2,FUN = 
+                            function(x) log(max(median(x),1)))
+zero_counts <- apply(sa_cross_counts[,-c(1,2)],2,FUN = 
+                       function(x) log(max(sum(x==0),1)))
+
+hk_lims <- hk_probs
+zc_lims <- zc_probs
+sa_cross_counts_filtered <- sapply(c(1:length(hk_medians)), 
+                             function(x){
+                               if(hk_medians[x] > hk_lims[1] & 
+                                  hk_medians[x] < hk_lims[2] &
+                                  zero_counts[x] > zc_lims[1] &
+                                  zero_counts[x] < zc_lims[2]){T}else{F}
+                             })
+
+
+```
+
+
+## Heatmap of Sa cross-mapped data showing filter
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_cross_log_counts <- log(sa_cross_counts_t + 1)
+
+col_fun = colorRamp2(c(min(sa_cross_log_counts), median(data.matrix(sa_cross_log_counts)), max(sa_cross_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- rep(brewer.pal(6,'Greys'),30)[1:length(unique(sa_cross_studies))]
+
+names(ann_colors) <- unique(sa_cross_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_cross_strains))]
+names(st_colors) <- unique(sa_cross_strains)
+
+ha <- HeatmapAnnotation(study = sa_cross_studies, 
+                        strain = sa_cross_strains,
+                        filter = sa_cross_counts_filtered,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors,
+                                    filter = c('TRUE'="white",'FALSE'="black")))
+
+h <- Heatmap(sa_cross_log_counts, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#h
+```
+
+
+## Heatmap of filtered Sa cross-mapped data 
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+sa_cross_log_counts <- log(sa_cross_counts_t + 1)
+
+col_fun = colorRamp2(c(min(sa_cross_log_counts), median(data.matrix(sa_cross_log_counts)), max(sa_cross_log_counts)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- colorRampPalette(brewer.pal(8, "Dark2"))(length(unique(sa_cross_studies)))
+names(ann_colors) <- unique(sa_cross_studies)
+ha <- HeatmapAnnotation(study = sa_cross_studies[sa_cross_counts_filtered], show_legend = F, col = list( study = ann_colors))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),30)[1:length(unique(sa_cross_studies))]
+
+names(ann_colors) <- unique(sa_cross_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_cross_strains))]
+names(st_colors) <- unique(sa_cross_strains)
+
+ha <- HeatmapAnnotation(study = se_studies[sa_cross_counts_filtered], 
+                        strain = se_strains[sa_cross_counts_filtered],
+                        #filter = se_counts_filtered,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors#,
+                                    #filter = c('TRUE'="white",'FALSE'="black")
+                                    ))
+
+h <- Heatmap(sa_cross_log_counts[,sa_cross_counts_filtered], col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#h
+```
+
+
+## Normalize function
+
+```{r}
+MRnorm <- function(data){
+  # Description: sample-wise median of ratio normalization on columns
+  # data: dataframe of gene expression counts to be normalized via DESeq2
+  # returns: dataframe normalized to geometric mean of all samples
+  meta <- data.frame(experiment = colnames(data))
+  dds <- DESeqDataSetFromMatrix(countData =
+                                       ceiling(data),
+                                     colData = meta, design = ~ experiment)
+  dds <- estimateSizeFactors(dds)
+  counts(dds, normalized=TRUE)
+}
+```
+
+
+### Se data normalize
+
+
+```{r}
+se_counts_norm  <- MRnorm(se_counts[,c(F,F,se_counts_filtered)])
+rownames(se_counts_norm) <- se_counts$X
+
+```
+
+
+## Haatmap of normalized, filtered and trimmed Se data
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+
+se_counts_norm_t <- se_counts_norm[rowSums(se_counts_norm) > 500,]
+rownames(se_counts_norm_t) <- rownames(se_counts_norm[rowSums(se_counts_norm) > 500,])
+dim(se_counts_norm_t)
+
+se_log_counts_norm_t <- data.frame(log(se_counts_norm_t  + 1))
+
+col_fun = colorRamp2(c(min(se_log_counts_norm_t), median(data.matrix(se_log_counts_norm_t)), max(se_log_counts_norm_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- colorRampPalette(brewer.pal(8, "Dark2"))(length(unique(se_studies)))
+names(ann_colors) <- unique(se_studies)
+ha <- HeatmapAnnotation(study = se_studies[se_counts_filtered], show_legend = F, col = list( study = ann_colors))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),30)[1:length(unique(se_studies))]
+
+names(ann_colors) <- unique(se_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(se_strains))]
+names(st_colors) <- unique(se_strains)
+
+ha <- HeatmapAnnotation(study = se_studies[se_counts_filtered], 
+                        strain = se_strains[se_counts_filtered],
+                        #filter = se_counts_filtered,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors#,
+                                    #filter = c('TRUE'="white",'FALSE'="black")
+                                    ))
+
+
+h <- Heatmap(se_log_counts_norm_t, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(6,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             )
+#h
+```
+
+
+## Write out Se compendia
+
+
+```{r}
+#rownames(se_counts_norm) <- se_counts$X
+se_log_counts_norm <- data.frame(log(se_counts_norm  + 1))
+se_log_counts_norm_t <- data.frame(log(se_counts_norm_t  + 1))
+#write.csv(se_counts_norm, 'compendia/sepi_pan_genome_clean_norm.csv', row.names = F)
+#write.csv(se_log_counts_norm, 'compendia/sepi_pan_genome_clean_norm_log.csv', row.names = F)
+#write.csv(se_counts_norm_t, 'compendia/sepi_pan_genome_trimmed_clean_norm.csv', row.names = F)
+#write.csv(se_log_counts_norm_t, 'compendia/sepi_pan_genome_trimmed_clean_norm_log.csv', row.names = F)
+
+```
+
+
+## Log transform and write out Se data
+
+
+```{r}
+range <- max(se_log_counts_norm) - min(se_log_counts_norm)
+range_t <- max(se_log_counts_norm_t) - min(se_log_counts_norm_t)
+min(se_log_counts_norm[se_log_counts_norm > 0])
+
+se_log_counts_norm_01 <- se_log_counts_norm / range
+se_log_counts_norm_t_01 <- se_log_counts_norm_t / range_t
+
+max(se_log_counts_norm_01)
+min(se_log_counts_norm_01)
+
+#write.csv(se_log_counts_norm_01, 'compendia/sepi_pan_genome_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(se_log_counts_norm_01, 'compendia/sepi_pan_genome_log_counts_norm_01.csv', row.names = T)
+
+#write.csv(se_log_counts_norm_t_01, 'compendia/sepi_pan_genome_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(se_log_counts_norm_t_01, 'compendia/sepi_pan_genome_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+### Sa data normalize
+
+
+```{r}
+sa_counts_norm  <- MRnorm(sa_counts[,c(F,F,sa_counts_filtered)])
+rownames(sa_counts_norm) <- sa_counts$X
+```
+
+
+## Heatmap of Sa data filtered, normalized, trimmed
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+sa_counts_norm_t <- sa_counts_norm[rowSums(sa_counts_norm) > 1000,]
+dim(sa_counts_norm_t)
+
+sa_log_counts_norm_t <- data.frame(log(sa_counts_norm_t  + 1))
+
+col_fun = colorRamp2(c(min(sa_log_counts_norm_t), median(data.matrix(sa_log_counts_norm_t)), max(sa_log_counts_norm_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- colorRampPalette(brewer.pal(8, "Dark2"))(length(unique(sa_studies)))
+names(ann_colors) <- unique(sa_studies)
+ha <- HeatmapAnnotation(study = sa_studies[sa_counts_filtered], show_legend = F, col = list( study = ann_colors))
+
+h <- Heatmap(sa_log_counts_norm_t, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(6,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             )
+#h
+```
+
+
+## Write out Sa compendia
+
+
+```{r}
+sa_log_counts_norm <- data.frame(log(sa_counts_norm  + 1))
+sa_log_counts_norm_t <- data.frame(log(sa_counts_norm_t  + 1))
+#write.csv(sa_counts_norm, 'compendia/saur_pan_genome_clean_norm.csv', row.names = F)
+#write.csv(sa_log_counts_norm, 'compendia/saur_pan_genome_clean_norm_log.csv', row.names = F)
+#write.csv(sa_counts_norm_t, 'compendia/saur_pan_genome_trimmed_clean_norm.csv', row.names = F)
+#write.csv(sa_log_counts_norm_t, 'compendia/saur_pan_genome_trimmed_clean_norm_log.csv', row.names = F)
+
+```
+
+
+## Log transform and write out Sa comps
+
+
+```{r}
+range <- max(sa_log_counts_norm) - min(sa_log_counts_norm)
+range_t <- max(sa_log_counts_norm_t) - min(sa_log_counts_norm_t)
+min(sa_log_counts_norm[sa_log_counts_norm > 0])
+
+sa_log_counts_norm_01 <- sa_log_counts_norm / range
+sa_log_counts_norm_t_01 <- sa_log_counts_norm_t / range_t
+
+max(sa_log_counts_norm_01)
+min(sa_log_counts_norm_01)
+
+#write.csv(sa_log_counts_norm_01, 'compendia/saur_pan_genome_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_log_counts_norm_01, 'compendia/saur_pan_genome_log_counts_norm_01.csv', row.names = T)
+
+#write.csv(sa_log_counts_norm_t_01, 'compendia/saur_pan_genome_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_log_counts_norm_t_01, 'compendia/saur_pan_genome_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+
+### Normalize cross-mapped data
+
+
+```{r}
+sa_cross_counts_norm  <- MRnorm(sa_cross_counts[,c(F,F,sa_cross_counts_filtered)])
+rownames(sa_cross_counts_norm) <- sa_cross_counts$X
+```
+
+
+## Heatmap of Sa cross-mapped data filterend, norm, trimmed
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+sa_cross_counts_norm_t <- sa_cross_counts_norm[rowSums(se_counts_norm) > 500,]
+rownames(sa_cross_counts_norm_t) <- rownames(sa_cross_counts_norm[rowSums(se_counts_norm) > 500,])
+dim(sa_cross_counts_norm_t)
+
+sa_cross_log_counts_norm_t <- data.frame(log(sa_cross_counts_norm_t  + 1))
+
+col_fun = colorRamp2(c(min(sa_cross_log_counts_norm_t), median(data.matrix(sa_cross_log_counts_norm_t)), max(sa_cross_log_counts_norm_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- colorRampPalette(brewer.pal(8, "Dark2"))(length(unique(sa_cross_studies)))
+names(ann_colors) <- unique(sa_cross_studies)
+ha <- HeatmapAnnotation(study = sa_cross_studies[sa_cross_counts_filtered], show_legend = F, col = list( study = ann_colors))
+
+h <- Heatmap(sa_cross_log_counts_norm_t, col = col_fun, 
+             top_annotation = ha,
+             height = unit(6,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(6,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             )
+#h
+```
+
+
+## Write out cross mapped data
+
+
+```{r}
+sa_cross_log_counts_norm <- data.frame(log(sa_cross_counts_norm  + 1))
+sa_cross_log_counts_norm_t <- data.frame(log(sa_cross_counts_norm_t  + 1))
+#write.csv(sa_cross_counts_norm, 'compendia/saur_pan_genome_CROSS_clean_norm.csv', row.names = F)
+#write.csv(sa_cross_log_counts_norm, 'compendia/saur_pan_genome_CROSS_clean_norm_log.csv', row.names = F)
+#write.csv(sa_cross_counts_norm_t, 'compendia/saur_pan_genome_CROSS_trimmed_clean_norm.csv', row.names = F)
+#write.csv(sa_cross_log_counts_norm_t, 'compendia/saur_pan_genome_CROSS_trimmed_clean_norm_log.csv', row.names = F)
+
+```
+
+
+## Log transform and write out cross mapped data
+
+
+```{r}
+range <- max(sa_cross_log_counts_norm) - min(sa_cross_log_counts_norm)
+range_t <- max(sa_cross_log_counts_norm_t) - min(sa_cross_log_counts_norm_t)
+min(sa_cross_log_counts_norm[sa_cross_log_counts_norm > 0])
+
+sa_cross_log_counts_norm_01 <- sa_cross_log_counts_norm / range
+sa_cross_log_counts_norm_t_01 <- sa_cross_log_counts_norm_t / range_t
+
+max(sa_cross_log_counts_norm_01)
+min(sa_cross_log_counts_norm_01)
+
+#write.csv(sa_cross_log_counts_norm_01, 'compendia/saur_pan_genome_CROSS_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_cross_log_counts_norm_01, 'compendia/saur_pan_genome_CROSS_log_counts_norm_01.csv', row.names = T)
+
+#write.csv(sa_cross_log_counts_norm_t_01, 'compendia/saur_pan_genome_CROSS_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_cross_log_counts_norm_t_01, 'compendia/saur_pan_genome_CROSS_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+
+## Re-order Se by RAND to match Se
+
+
+```{r}
+set.seed(22)
+rand_order <-  sample(rownames(se_log_counts_norm_01), nrow(se_log_counts_norm_01), replace = F)
+
+se_log_counts_norm_01_rand <- se_log_counts_norm_01[rand_order ,]
+rownames(se_log_counts_norm_01_rand) <- rownames(se_log_counts_norm_01)
+#write.csv(se_log_counts_norm_01_rand, 'compendia/sepi_pan_genome_RAND_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(se_log_counts_norm_01_rand, 'compendia/sepi_pan_genome_RAND_log_counts_norm_01.csv', row.names = T)
+
+
+
+rand_order_t <- rand_order[rowSums(se_counts_norm[rand_order,]) > 500]
+se_log_counts_norm_t_01_rand <- se_log_counts_norm_t_01[rand_order_t,]
+se_log_counts_norm_t_01_rand[is.na(se_log_counts_norm_t_01_rand)] <- 0
+rownames(se_log_counts_norm_t_01_rand) <- rownames(se_log_counts_norm_t_01)
+write.csv(se_log_counts_norm_t_01_rand, 'compendia/sepi_pan_genome_RAND_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+write.csv(se_log_counts_norm_t_01_rand, 'compendia/sepi_pan_genome_RAND_trimmed_log_counts_norm_01.csv', row.names = T)
+
+```
+
+
+
+## Re-order Sa cross-mapped by RAND to match Se
+
+
+```{r}
+
+sa_cross_log_counts_norm_01_rand <- sa_cross_log_counts_norm_01[rand_order ,]
+rownames(sa_cross_log_counts_norm_01_rand) <- rownames(se_log_counts_norm_01)
+
+write.csv(sa_cross_log_counts_norm_01_rand, 'compendia/saur_pan_genome_CROSS_RAND_log_counts_norm_01_nonames.csv', row.names = F)
+write.csv(sa_cross_log_counts_norm_01_rand, 'compendia/saur_pan_genome_CROSS_RAND_log_counts_norm_01.csv', row.names = T)
+
+
+
+sa_cross_log_counts_norm_t_01_rand <- sa_cross_log_counts_norm_t_01[rand_order_t ,]
+rownames(sa_cross_log_counts_norm_t_01_rand) <- rownames(se_log_counts_norm_t_01)
+write.csv(sa_cross_log_counts_norm_t_01_rand, 'compendia/saur_pan_genome_CROSS_RAND_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+write.csv(sa_cross_log_counts_norm_t_01_rand, 'compendia/saur_pan_genome_CROSS_RAND_trimmed_log_counts_norm_01.csv', row.names = T)
+
+```
+
+
+
+
+
+## Re-order Sa by BLAST to match Se
+
+
+```{r}
+pan_map <- read.csv('se_sa_pan_map.csv', stringsAsFactors = F)
+pan_map <- pan_map[order(pan_map$hit_evalue),]
+rownames(pan_map) <- make.unique(pan_map$se_ID)
+
+se_gene_order <- rownames(se_log_counts_norm_01)
+se_gene_order_sa <- pan_map[se_gene_order, "sa_ID"]
+
+sa_blast_map <- sa_log_counts_norm_01[se_gene_order_sa,]
+rownames(sa_blast_map) <- se_gene_order
+sa_blast_map[is.na(sa_blast_map)] <- 0
+
+#write.csv(sa_blast_map, 'compendia/saur_pan_genome_BLAST_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_blast_map, 'compendia/saur_pan_genome_BLAST_log_counts_norm_01.csv', row.names = T)
+```
+
+
+```{r}
+m <- melt(sa_blast_map)
+g <- ggplot(m, aes(x = value + (min(m$value[m$value > 0]) / 2))) +
+  geom_histogram(aes(y=after_stat(count))) +
+  #geom_density() +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_prism()
+g
+```
+
+
+```{r}
+se_gene_order_t <- rownames(se_log_counts_norm_t_01)
+se_gene_order_sa_t <- pan_map[se_gene_order_t, "sa_ID"]
+
+sa_blast_map_t <- sa_log_counts_norm_t_01[se_gene_order_sa_t,]
+rownames(sa_blast_map_t) <- se_gene_order_t
+sa_blast_map_t[is.na(sa_blast_map_t)] <- 0
+
+#write.csv(sa_blast_map_t, 'compendia/saur_pan_genome_BLAST_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_blast_map_t, 'compendia/saur_pan_genome_BLAST_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+```{r}
+m <- melt(sa_blast_map_t)
+g <- ggplot(m, aes(x = value + (min(m$value[m$value > 0]) / 2))) +
+  geom_histogram(aes(y=after_stat(count))) +
+  #geom_density() +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_prism()
+g
+```
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+col_fun = colorRamp2(c(min(sa_blast_map_t), median(data.matrix(sa_blast_map_t)), max(sa_blast_map_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+ann_colors <- colorRampPalette(brewer.pal(8, "Dark2"))(length(unique(sa_studies)))
+names(ann_colors) <- unique(sa_studies)
+ha <- HeatmapAnnotation(study = sa_studies[sa_counts_filtered], show_legend = F, col = list( study = ann_colors))
+
+ann_colors <- rep(brewer.pal(6,'Greys'),100)[1:length(unique(sa_studies))]
+
+names(ann_colors) <- unique(sa_studies)
+
+st_colors <- rep(brewer.pal(8,'Dark2'),3)[1:length(unique(sa_strains))]
+names(st_colors) <- unique(sa_strains)
+
+ha <- HeatmapAnnotation(study = sa_studies[sa_counts_filtered], 
+                        strain = sa_strains[sa_counts_filtered],
+                        #filter = se_counts_filtered,
+                        show_legend = c(F,T,T), 
+                        col = list( study = ann_colors,
+                                    strain = st_colors#,
+                                    #filter = c('TRUE'="white",'FALSE'="black")
+                                    ))
+
+h <- Heatmap(sa_blast_map_t, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             cluster_rows = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#png('plots/Sa_BLAST_noclust.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+```
+
+
+
+
+## Re-order Sa  by RAND to match Se
+
+```{r}
+
+
+rand_order_sa <-  sample(rownames(sa_log_counts_norm_01), length(se_gene_order_sa), replace = T)
+
+sa_log_counts_norm_01_rand <- sa_log_counts_norm_01[rand_order_sa ,]
+rownames(sa_log_counts_norm_01_rand) <- rownames(se_log_counts_norm_01)
+
+sum(!is.na(rowSums(sa_log_counts_norm_01_rand)))
+
+sa_log_counts_norm_01_rand[is.na(sa_log_counts_norm_01_rand)] <- 0
+
+#write.csv(sa_log_counts_norm_01_rand, 'compendia/saur_pan_genome_RAND_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_log_counts_norm_01_rand, 'compendia/saur_pan_genome_RAND_log_counts_norm_01.csv', row.names = T)
+```
+
+
+
+```{r}
+
+rand_order_sa_t <- rand_order_sa[rowSums(se_counts_norm) > 500]
+sa_log_counts_norm_t_01_rand <- sa_log_counts_norm_t_01[rand_order_sa_t,]
+sa_log_counts_norm_t_01_rand[is.na(sa_log_counts_norm_t_01_rand)] <- 0
+rownames(sa_log_counts_norm_t_01_rand) <- se_gene_order_t
+
+write.csv(sa_log_counts_norm_t_01_rand, 'compendia/saur_pan_genome_RAND_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+write.csv(sa_log_counts_norm_t_01_rand, 'compendia/saur_pan_genome_RAND_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+col_fun = colorRamp2(c(min(sa_blast_map), median(data.matrix(sa_blast_map)), max(sa_blast_map)), c("grey", "#E7D4E8", "#762A83"))
+
+
+
+
+h <- Heatmap(sa_blast_map, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+            cluster_rows = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#png('plots/Sa_RAND_noclust.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+```
+
+
+
+## Re-order Sa by BLAST with RAND to match Se
+
+
+```{r}
+
+se_gene_order_sa_bg_rand <- se_gene_order_sa
+se_gene_order_sa_bg_rand[(se_gene_order_sa == "") | is.na(se_gene_order_sa)] <- rand_order_sa[(se_gene_order_sa == "") | is.na(se_gene_order_sa)]
+
+sa_blast_map_randfill <- sa_log_counts_norm_01[se_gene_order_sa_bg_rand,]
+rownames(sa_blast_map_randfill) <- se_gene_order
+sum(!is.na(rowSums(sa_blast_map_randfill, na.rm=T)))
+
+sa_blast_map_randfill[is.na(sa_blast_map_randfill)] <- 0
+
+#write.csv(sa_blast_map_randfill, 'compendia/saur_pan_genome_BLAST_with_rand_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_blast_map_randfill, 'compendia/saur_pan_genome_BLAST_with_rand_log_counts_norm_01.csv', row.names = T)
+```
+
+
+
+```{r}
+m <- melt(sa_blast_map_randfill)
+g <- ggplot(m, aes(x = value + (min(m$value[m$value > 0]) / 2))) +
+  geom_histogram(aes(y=after_stat(count))) +
+  #geom_density() +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_prism()
+g
+```
+
+
+
+
+```{r}
+se_gene_order_sa_bg_rand_t <- se_gene_order_sa_t
+se_gene_order_sa_bg_rand_t[(se_gene_order_sa_t == "") | is.na(se_gene_order_sa_t)] <- rand_order_sa_t[(se_gene_order_sa_t == "") | is.na(se_gene_order_sa_t)]
+
+
+sa_blast_map_randfill_t <- sa_log_counts_norm_t_01[se_gene_order_sa_bg_rand_t,]
+rownames(sa_blast_map_randfill_t) <- se_gene_order_t
+sum(!is.na(rowSums(sa_blast_map_randfill_t, na.rm=T)))
+
+sa_blast_map_randfill_t[is.na(sa_blast_map_randfill_t)] <- 0
+
+write.csv(sa_blast_map_randfill_t, 'compendia/saur_pan_genome_BLAST_with_rand_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+write.csv(sa_blast_map_randfill_t, 'compendia/saur_pan_genome_BLAST_with_rand_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+```{r}
+m <- melt(sa_blast_map_randfill_t)
+g <- ggplot(m, aes(x = value + (min(m$value[m$value > 0]) / 2))) +
+  geom_histogram(aes(y=after_stat(count))) +
+  #geom_density() +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_prism()
+g
+```
+
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+col_fun = colorRamp2(c(min(sa_blast_map_t), median(data.matrix(sa_blast_map_t)), max(sa_blast_map_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+
+h <- Heatmap(sa_blast_map_t, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             cluster_rows = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#png('plots/Sa_BLASTwRand_noclust.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+```
+
+
+
+
+
+
+## Re-order Sa by FOLDSEEK to match Se
+
+
+```{r}
+fs_map <- read.csv('saur_sepi_aln_g.m8', stringsAsFactors = F, sep = '\t',
+                   header = F)
+
+fs_map_best_hits <- fs_map[order(fs_map$V11),]
+rownames(fs_map_best_hits) <- make.unique(fs_map_best_hits$V2)
+fs_map_best_hits <- fs_map_best_hits[rownames(fs_map_best_hits) %in% fs_map_best_hits$V2,]
+
+rownames(fs_map_best_hits) <- make.unique(fs_map_best_hits$V1)
+
+firsts <- fs_map_best_hits[rownames(fs_map_best_hits) %in% fs_map_best_hits$V1,]
+n_firsts <- fs_map_best_hits[!rownames(fs_map_best_hits) %in% fs_map_best_hits$V1,]
+
+
+fs_map_best_hits_rev <- fs_map[order(fs_map$V11),]
+rownames(fs_map_best_hits_rev) <- make.unique(fs_map_best_hits_rev$V1)
+fs_map_best_hits_rev <- fs_map_best_hits_rev[rownames(fs_map_best_hits_rev) %in% fs_map_best_hits_rev$V1,]
+
+length(unique(fs_map_best_hits_rev$V1))
+length(unique(fs_map_best_hits_rev$V2))
+
+secs <- fs_map_best_hits_rev[fs_map_best_hits_rev$V2 %in% n_firsts$V2,]
+rownames(secs) <- make.unique(secs$V2)
+
+sum(rownames(secs) %in% secs$V2)
+
+fs_map_out <- rbind(firsts, secs, n_firsts[!n_firsts$V2 %in% secs$V2,])
+
+
+sa_gene_loci$name_id[is.na(sa_gene_loci$name_id)] <- ""
+rownames(sa_gene_loci) <- make.unique(sa_gene_loci$name_id)
+
+se_gene_loci$name_id[is.na(se_gene_loci$name_id)] <- ""
+rownames(se_gene_loci) <- make.unique(se_gene_loci$name_id)
+
+
+fs_map_out$sa_ID <- sa_gene_loci[fs_map_out$V1, "locus_id"]
+fs_map_out$se_ID <- se_gene_loci[fs_map_out$V2, "locus_id"]
+
+fs_map_out$sa_ID[is.na(fs_map_out$sa_ID)] <- ""
+fs_map_out$se_ID[is.na(fs_map_out$se_ID)] <- ""
+
+rownames(fs_map_out) <- make.unique(fs_map_out$se_ID)
+
+sum(se_gene_order %in% rownames(fs_map_out))
+
+se_gene_order_sa_fs <- fs_map_out[se_gene_order, "sa_ID"]
+
+sa_fs_map <- sa_log_counts_norm_01[se_gene_order_sa_fs,]
+rownames(sa_fs_map) <- se_gene_order
+sum(!is.na(rowSums(sa_fs_map)))
+
+sa_fs_map[is.na(sa_fs_map)] <- 0
+
+#write.csv(sa_fs_map, 'compendia/saur_pan_genome_FLDSK_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_fs_map, 'compendia/saur_pan_genome_FLDSK_log_counts_norm_01.csv', row.names = T)
+```
+
+```{r}
+write.csv(fs_map_out, "foldseek_mapping_out.csv", row.names=T)
+```
+
+
+
+```{r}
+
+se_gene_order_sa_t_fs <- fs_map_out[se_gene_order_t, "sa_ID"]
+
+sa_fs_map_t <- sa_log_counts_norm_01[se_gene_order_sa_t_fs,]
+rownames(sa_fs_map_t) <- se_gene_order_t
+sa_fs_map_t[is.na(sa_fs_map_t)] <- 0
+
+#write.csv(sa_fs_map_t, 'compendia/saur_pan_genome_FLDSK_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_fs_map_t, 'compendia/saur_pan_genome_FLDSK_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+col_fun = colorRamp2(c(min(sa_blast_map_t), median(data.matrix(sa_blast_map_t)), max(sa_blast_map_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+
+h <- Heatmap(sa_blast_map_t, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             cluster_rows = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#png('plots/Sa_FLDSK_noclust.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+```
+
+## Re-order Sa by FOLDSEEK with RAND to match Se
+
+
+```{r}
+
+
+se_gene_order_sa_fs[(se_gene_order_sa_fs == "") | is.na(se_gene_order_sa_fs)] <- rand_order_sa[(se_gene_order_sa_fs == "") | is.na(se_gene_order_sa_fs)]
+
+sa_fs_map_randfill <- sa_log_counts_norm_01[se_gene_order_sa_fs,]
+rownames(sa_fs_map_randfill) <- se_gene_order
+sum(!is.na(rowSums(sa_fs_map_randfill)))
+
+sa_fs_map_randfill[is.na(sa_fs_map_randfill)] <- 0
+
+#write.csv(sa_fs_map_randfill, 'compendia/saur_pan_genome_FLDSK_with_rand_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_fs_map_randfill, 'compendia/saur_pan_genome_FLDSK_with_rand_log_counts_norm_01.csv', row.names = T)
+```
+
+
+
+```{r}
+
+
+se_gene_order_sa_t_fs[(se_gene_order_sa_t_fs == "") | is.na(se_gene_order_sa_t_fs)] <- rand_order_sa_t[(se_gene_order_sa_t_fs == "") | is.na(se_gene_order_sa_t_fs)]
+
+sa_fs_map_t_randfill <- sa_log_counts_norm_01[se_gene_order_sa_t_fs,]
+rownames(sa_fs_map_t_randfill) <- se_gene_order_t
+sum(!is.na(rowSums(sa_fs_map_t_randfill)))
+
+sa_fs_map_t_randfill[is.na(sa_fs_map_t_randfill)] <- 0
+
+write.csv(sa_fs_map_t_randfill, 'compendia/saur_pan_genome_FLDSK_with_rand_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+write.csv(sa_fs_map_t_randfill, 'compendia/saur_pan_genome_FLDSK_with_rand_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+col_fun = colorRamp2(c(min(sa_blast_map_t), median(data.matrix(sa_blast_map_t)), max(sa_blast_map_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+
+h <- Heatmap(sa_blast_map_t, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             cluster_rows = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#png('plots/Sa_FLDSKwRand_noclust.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+```
+
+## Re-order Sa by FOLDSEEK-EXHUASTIVE to match Se
+
+
+```{r}
+
+fs_map <- read.csv('saur_sepi_aln_g_exh.m8', stringsAsFactors = F, sep = '\t',
+                   header = F)
+
+fs_map_best_hits <- fs_map[order(fs_map$V11),]
+rownames(fs_map_best_hits) <- make.unique(fs_map_best_hits$V2)
+fs_map_best_hits <- fs_map_best_hits[rownames(fs_map_best_hits) %in% fs_map_best_hits$V2,]
+
+rownames(fs_map_best_hits) <- make.unique(fs_map_best_hits$V1)
+
+firsts <- fs_map_best_hits[rownames(fs_map_best_hits) %in% fs_map_best_hits$V1,]
+n_firsts <- fs_map_best_hits[!rownames(fs_map_best_hits) %in% fs_map_best_hits$V1,]
+
+length(unique(fs_map_best_hits$V1))
+length(unique(fs_map_best_hits$V2))
+
+fs_map_best_hits_rev <- fs_map[order(fs_map$V11),]
+rownames(fs_map_best_hits_rev) <- make.unique(fs_map_best_hits_rev$V1)
+fs_map_best_hits_rev <- fs_map_best_hits_rev[rownames(fs_map_best_hits_rev) %in% fs_map_best_hits_rev$V1,]
+
+length(unique(fs_map_best_hits_rev$V1))
+length(unique(fs_map_best_hits_rev$V2))
+
+secs <- fs_map_best_hits_rev[fs_map_best_hits_rev$V2 %in% n_firsts$V2,]
+rownames(secs) <- make.unique(secs$V2)
+
+sum(rownames(secs) %in% secs$V2)
+
+fs_map_out <- rbind(firsts, secs, n_firsts[!n_firsts$V2 %in% secs$V2,])
+
+
+length(unique(fs_map_out$V1))
+length(unique(fs_map_out$V2))
+
+sa_gene_loci$name_id[is.na(sa_gene_loci$name_id)] <- ""
+rownames(sa_gene_loci) <- make.unique(sa_gene_loci$name_id)
+
+se_gene_loci$name_id[is.na(se_gene_loci$name_id)] <- ""
+rownames(se_gene_loci) <- make.unique(se_gene_loci$name_id)
+
+
+fs_map_out$sa_ID <- sa_gene_loci[fs_map_out$V1, "locus_id"]
+fs_map_out$se_ID <- se_gene_loci[fs_map_out$V2, "locus_id"]
+
+fs_map_out$sa_ID[is.na(fs_map_out$sa_ID)] <- ""
+fs_map_out$se_ID[is.na(fs_map_out$se_ID)] <- ""
+
+rownames(fs_map_out) <- make.unique(fs_map_out$se_ID)
+
+sum(se_gene_order %in% rownames(fs_map_out))
+
+se_gene_order_sa_fsexh <- fs_map_out[se_gene_order, "sa_ID"]
+
+sa_fsexh_map <- sa_log_counts_norm_01[se_gene_order_sa_fsexh,]
+rownames(sa_fsexh_map) <- se_gene_order
+sum(!is.na(rowSums(sa_fsexh_map)))
+
+sa_fsexh_map[is.na(sa_fsexh_map)] <- 0
+
+#write.csv(sa_fsexh_map, 'compendia/saur_pan_genome_FLDSKEXH_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_fsexh_map, 'compendia/saur_pan_genome_FLDSKEXH_log_counts_norm_01.csv', row.names = T)
+
+```
+
+```{r}
+write.csv(fs_map_out, "foldseek_exhaustive_mapping_out.csv", row.names=T)
+```
+
+
+
+
+
+```{r}
+
+se_gene_order_sa_t_fsexh <- fs_map_out[se_gene_order_t, "sa_ID"]
+
+sa_fsexh_map_t <- sa_log_counts_norm_01[se_gene_order_sa_t_fsexh,]
+rownames(sa_fsexh_map_t) <- se_gene_order_t
+sa_fsexh_map_t[is.na(sa_fsexh_map_t)] <- 0
+
+#write.csv(sa_fsexh_map_t, 'compendia/saur_pan_genome_FLDSKEXH_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_fsexh_map_t, 'compendia/saur_pan_genome_FLDSKEXH_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+col_fun = colorRamp2(c(min(sa_blast_map_t), median(data.matrix(sa_blast_map_t)), max(sa_blast_map_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+
+h <- Heatmap(sa_blast_map_t, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             cluster_rows = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#png('plots/Sa_FLDSKEXH_noclust.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+```
+
+## Re-order Sa by FOLDSEEK-EXHUASTIVE with RAND to match Se
+
+
+```{r}
+
+
+se_gene_order_sa_fsexh_bg_rand <- se_gene_order_sa_fsexh
+
+se_gene_order_sa_fsexh_bg_rand[(se_gene_order_sa_fsexh == "") | is.na(se_gene_order_sa_fsexh)] <- rand_order_sa[(se_gene_order_sa_fsexh == "") | is.na(se_gene_order_sa_fsexh)]
+
+sa_fsexh_map_randfill <- sa_log_counts_norm_01[se_gene_order_sa_fsexh_bg_rand,]
+rownames(sa_fsexh_map_randfill) <- se_gene_order
+sum(!is.na(rowSums(sa_fsexh_map_randfill)))
+
+sa_fsexh_map_randfill[is.na(sa_fsexh_map_randfill)] <- 0
+
+#write.csv(sa_fsexh_map_randfill, 'compendia/saur_pan_genome_FLDSKEXH_with_rand_log_counts_norm_01_nonames.csv', row.names = F)
+#write.csv(sa_fsexh_map_randfill, 'compendia/saur_pan_genome_FLDSKEXH_with_rand_log_counts_norm_01.csv', row.names = T)
+```
+
+
+
+
+```{r}
+
+se_gene_order_sa_fsexh_bg_rand_t <- se_gene_order_sa_t_fsexh
+se_gene_order_sa_fsexh_bg_rand_t[(se_gene_order_sa_t_fsexh == "") | is.na(se_gene_order_sa_t_fsexh)] <- rand_order_sa_t[(se_gene_order_sa_t_fsexh == "") | is.na(se_gene_order_sa_t_fsexh)]
+
+
+sa_fsexh_map_randfill_t <- sa_log_counts_norm_t_01[se_gene_order_sa_fsexh_bg_rand_t,]
+rownames(sa_fsexh_map_randfill_t) <- se_gene_order_t
+sum(!is.na(rowSums(sa_fsexh_map_randfill_t, na.rm=T)))
+
+sa_fsexh_map_randfill_t[is.na(sa_fsexh_map_randfill_t)] <- 0
+
+write.csv(sa_fsexh_map_randfill_t, 'compendia/saur_pan_genome_FLDSKEXH_with_rand_trimmed_log_counts_norm_01_nonames.csv', row.names = F)
+write.csv(sa_fsexh_map_randfill_t, 'compendia/saur_pan_genome_FLDSKEXH_with_rand_trimmed_log_counts_norm_01.csv', row.names = T)
+```
+
+
+```{r, warning=F, message=F,, fig.width=12, fig.height=6}
+
+col_fun = colorRamp2(c(min(sa_blast_map_t), median(data.matrix(sa_blast_map_t)), max(sa_blast_map_t)), c("grey", "#E7D4E8", "#762A83"))
+
+
+
+h <- Heatmap(sa_blast_map_t, col = col_fun, 
+            top_annotation = ha,
+             height = unit(8,"cm"),
+             width = unit(24,"cm"),
+             cluster_columns = F,
+             cluster_rows = F,
+             heatmap_legend_param = list(
+               title = 'log counts',
+             legend_height = unit(8,"cm"),
+             title_position = "leftcenter-rot"
+             ),
+             column_names_gp = gpar(fontsize=6),
+             show_row_names = F,
+             show_column_names = F
+             )
+#png('plots/Sa_FLDSKEXHwRand_noclust.#png', height=6, width=12, unit = "in", res = 150)
+#h
+#dev.off()
+```
+
+
+```{r}
+
+```
+
